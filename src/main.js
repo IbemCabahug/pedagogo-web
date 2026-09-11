@@ -10,6 +10,7 @@ import { ClassManager } from './class-manager.js';
 import { TaskStudio } from './task-studio.js';
 import { DocumentDesk } from './document-desk.js';
 import { ReviewerStudio } from './reviewer-studio.js';
+import { FieldStudyNotebook } from './field-study-notebook.js';
 
 class PedagogoDeskApp {
   constructor() {
@@ -40,6 +41,7 @@ class PedagogoDeskApp {
     this.taskStudio = new TaskStudio();
     this.documentDesk = new DocumentDesk();
     this.reviewerStudio = new ReviewerStudio();
+    this.fieldStudyNotebook = new FieldStudyNotebook();
     this.syncManager = new SyncManager((newData) => {
       this.onScheduleUpdated(newData);
     });
