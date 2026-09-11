@@ -279,6 +279,8 @@ export class SyncManager {
     const assessments = parseKey('pedagogo_assessments', null);
     const planLibrary = parseKey('pedagogo_lp_plans', null);
     const planDraft = parseKey('pedagogo_lp_draft', null);
+    const letFlags = parseKey('pedagogo_let_flags', []);
+    const letLogs = parseKey('pedagogo_let_logs', []);
     const theme = localStorage.getItem('pedagogo_theme') || 'light';
     const perspective = localStorage.getItem('pedagogo_perspective') || 'STUDENT';
 
@@ -303,6 +305,8 @@ export class SyncManager {
         attendanceEntries: attendanceEntryCount,
         assessments: assessmentCount,
         assessmentScores: assessmentScoreCount,
+        letFlags: Array.isArray(letFlags) ? letFlags.length : 0,
+        letLogs: Array.isArray(letLogs) ? letLogs.length : 0,
         hasLessonPlan: !!savedLp
       },
       stores: {
@@ -312,6 +316,8 @@ export class SyncManager {
         pedagogo_students: students,
         pedagogo_enrollments: enrollments,
         pedagogo_let_cards: flashcards,
+        pedagogo_let_flags: letFlags,
+        pedagogo_let_logs: letLogs,
         pedagogo_fs_entries: fsEntries,
         pedagogo_saved_lp: savedLp,
         pedagogo_reading_history: readingHistory,
@@ -375,6 +381,7 @@ export class SyncManager {
     };
 
     const flashcardsCount = countItems('pedagogo_let_cards') || countItems('pedagogo_flashcards');
+    const letLogsCount = countItems('pedagogo_let_logs');
     const fsCount = countItems('pedagogo_fs_entries');
     const tasksCount = countItems('pedagogo_academic_tasks') || countItems('pedagogo_tasks');
     const classesCount = countItems('pedagogo_classrooms');
@@ -414,6 +421,7 @@ export class SyncManager {
       </div>
       <div class="inventory-pills">
         <span class="inv-pill"><strong>${flashcardsCount}</strong> LET Cards</span>
+        <span class="inv-pill"><strong>${letLogsCount}</strong> Drill Logs</span>
         <span class="inv-pill"><strong>${fsCount}</strong> FS Episodes</span>
         <span class="inv-pill"><strong>${tasksCount}</strong> Tasks &amp; IMs</span>
         <span class="inv-pill"><strong>${classesCount}</strong> Classes</span>
