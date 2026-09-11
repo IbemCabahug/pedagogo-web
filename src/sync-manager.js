@@ -253,7 +253,8 @@ export class SyncManager {
   }
 
   /**
-   * Generates a single, comprehensive .json archive of all 8 local storage modules.
+   * Generates a single, comprehensive .json archive of all local storage modules
+   * (schedule, tasks, classrooms, rosters, LET cards, FS logs, lesson plans, reading history, and SF2 attendance roll calls).
    */
   exportFullBackup() {
     const parseKey = (key, fallback) => {
@@ -271,8 +272,12 @@ export class SyncManager {
     const fsEntries = parseKey('pedagogo_fs_entries', []);
     const savedLp = parseKey('pedagogo_saved_lp', null);
     const readingHistory = parseKey('pedagogo_reading_history', []);
+    const attendance = parseKey('pedagogo_attendance_sessions', null);
     const theme = localStorage.getItem('pedagogo_theme') || 'light';
     const perspective = localStorage.getItem('pedagogo_perspective') || 'STUDENT';
+
+    const attendanceSessionCount = attendance && Array.isArray(attendance.sessions) ? attendance.sessions.length : 0;
+    const attendanceEntryCount = attendance && Array.isArray(attendance.entries) ? attendance.entries.length : 0;
 
     const fullArchive = {
       app: 'Pedagogo Desk',
@@ -286,6 +291,8 @@ export class SyncManager {
         students: Array.isArray(students) ? students.length : 0,
         flashcards: Array.isArray(flashcards) ? flashcards.length : 0,
         fieldStudyEntries: Array.isArray(fsEntries) ? fsEntries.length : 0,
+        attendanceSessions: attendanceSessionCount,
+        attendanceEntries: attendanceEntryCount,
         hasLessonPlan: !!savedLp
       },
       stores: {
@@ -298,6 +305,7 @@ export class SyncManager {
         pedagogo_fs_entries: fsEntries,
         pedagogo_saved_lp: savedLp,
         pedagogo_reading_history: readingHistory,
+        pedagogo_attendance_sessions: attendance,
         pedagogo_theme: theme,
         pedagogo_perspective: perspective
       }
@@ -359,6 +367,15 @@ export class SyncManager {
     const classesCount = countItems('pedagogo_classrooms');
     const subjectsCount = countItems('pedagogo_schedule');
 
+    let attendanceCount = 0;
+    try {
+      const attRaw = localStorage.getItem('pedagogo_attendance_sessions');
+      const att = attRaw ? JSON.parse(attRaw) : null;
+      attendanceCount = att && Array.isArray(att.sessions) ? att.sessions.length : 0;
+    } catch {
+      attendanceCount = 0;
+    }
+
     this.inventoryStrip.innerHTML = `
       <div class="inventory-header">
         <span>📦 Current In-Browser Data Inventory</span>
@@ -369,6 +386,7 @@ export class SyncManager {
         <span class="inv-pill"><strong>${fsCount}</strong> FS Episodes</span>
         <span class="inv-pill"><strong>${tasksCount}</strong> Tasks &amp; IMs</span>
         <span class="inv-pill"><strong>${classesCount}</strong> Classes</span>
+        <span class="inv-pill"><strong>${attendanceCount}</strong> Roll Calls</span>
         <span class="inv-pill"><strong>${subjectsCount}</strong> Subjects</span>
       </div>
     `;

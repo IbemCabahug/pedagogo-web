@@ -11,6 +11,7 @@ import { TaskStudio } from './task-studio.js';
 import { DocumentDesk } from './document-desk.js';
 import { ReviewerStudio } from './reviewer-studio.js';
 import { FieldStudyNotebook } from './field-study-notebook.js';
+import { AttendanceTracker } from './attendance-tracker.js';
 import { showToast } from './toast.js';
 
 class PedagogoDeskApp {
@@ -39,6 +40,7 @@ class PedagogoDeskApp {
     this.timetableView = new TimetableView(this.scheduleData);
     this.lessonPlanStudio = new LessonPlanStudio();
     this.classManager = new ClassManager();
+    this.attendanceTracker = new AttendanceTracker(this.classManager);
     this.taskStudio = new TaskStudio();
     this.documentDesk = new DocumentDesk();
     this.reviewerStudio = new ReviewerStudio();
@@ -92,6 +94,16 @@ class PedagogoDeskApp {
       this.classManager.enrollments = this.classManager.load(this.classManager.storageKeys.enrollments, []);
       this.classManager.selectedClassId = this.classManager.classes.length > 0 ? this.classManager.classes[0].id : null;
       this.renderClassroomView();
+    }
+
+    // 3b. Reload Attendance Tracker (SF2 roll calls)
+    if (this.attendanceTracker) {
+      this.attendanceTracker.store = this.attendanceTracker.loadStore();
+      this.attendanceTracker.selectedClassId = this.classManager?.selectedClassId || this.attendanceTracker.selectedClassId;
+      this.attendanceTracker.activeSessionId = this.attendanceTracker.getSessionsForClass(this.attendanceTracker.selectedClassId)[0]?.id || null;
+      if (this.attendanceTracker.container) {
+        this.attendanceTracker.render();
+      }
     }
 
     // 4. Reload Reviewer Studio
@@ -180,6 +192,14 @@ class PedagogoDeskApp {
     document.querySelectorAll('.tab-view').forEach(v => {
       v.classList.toggle('active', v.id === `view-${tabKey}`);
     });
+
+    // Refresh attendance view so it follows the latest roster/section selection
+    if (tabKey === 'attendance' && this.attendanceTracker) {
+      this.attendanceTracker.selectedClassId = this.classManager?.selectedClassId || this.attendanceTracker.selectedClassId;
+      if (this.attendanceTracker.container) {
+        this.attendanceTracker.render();
+      }
+    }
   }
 
   initPerspective() {

@@ -5658,3 +5658,442 @@ body.dark-mode .inventory-status {
   }
 }
 
+/* ==========================================================================
+   DepEd SF2 DAILY ATTENDANCE TRACKER 📋🌿
+   Calm roll call: sage present, honey tardy, slate excused, terracotta absent.
+   Red is never used as a penalty — per the calm anti-guilt design rules.
+   ========================================================================== */
+
+.att-launcher-card {
+  margin-bottom: 20px;
+}
+
+.att-launcher-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.att-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.att-field-grow {
+  flex: 1;
+  min-width: 240px;
+}
+
+.att-field label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+}
+
+.att-field select,
+.att-field input[type="date"] {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-light);
+  background: var(--surface-white);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  min-width: 200px;
+}
+
+.att-field select:focus,
+.att-field input[type="date"]:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 99, 71, 0.12);
+}
+
+.att-launcher-hint {
+  margin-top: 14px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.att-empty-card {
+  text-align: center;
+  padding: 40px 24px;
+}
+
+.att-empty-card .empty-icon {
+  font-size: 42px;
+  margin-bottom: 8px;
+}
+
+.att-empty-card h4 {
+  font-size: 17px;
+  margin-bottom: 8px;
+}
+
+.att-empty-card p {
+  color: var(--text-muted);
+  font-size: 13.5px;
+  max-width: 480px;
+  margin: 0 auto 16px;
+}
+
+.att-session-card {
+  margin-bottom: 24px;
+}
+.att-session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.att-session-title {
+  font-size: 16px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.att-closed-badge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--sage-light);
+  color: var(--sage-text);
+}
+
+.att-summary-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.att-chip {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 11px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.att-chip.chip-present {
+  background: var(--sage-light);
+  color: var(--sage-text);
+}
+
+.att-chip.chip-tardy {
+  background: var(--honey-light);
+  color: var(--honey-text);
+}
+
+.att-chip.chip-excused {
+  background: var(--surface-subtle);
+  color: var(--text-main);
+}
+
+.att-chip.chip-absent {
+  background: var(--terracotta-light);
+  color: var(--terracotta-text);
+}
+
+.att-session-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.att-rate-bar {
+  height: 8px;
+  background: var(--surface-subtle);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.att-rate-fill {
+  height: 100%;
+  background: var(--sage-primary);
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+
+.att-rate-caption {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 18px;
+}
+
+.att-student-rate {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.att-seg-control {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--surface-subtle);
+  padding: 4px;
+  border-radius: 22px;
+}
+
+.att-seg-btn {
+  border: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.att-seg-btn:hover {
+  color: var(--text-main);
+}
+
+.att-seg-btn.seg-present.active {
+  background: var(--sage-primary);
+  color: #FFFFFF;
+}
+
+.att-seg-btn.seg-tardy.active {
+  background: var(--honey-tertiary);
+  color: #FFFFFF;
+}
+
+.att-seg-btn.seg-excused.active {
+  background: #5E7185;
+  color: #FFFFFF;
+}
+
+.att-seg-btn.seg-absent.active {
+  background: var(--terracotta-secondary);
+  color: #FFFFFF;
+}
+
+.att-remarks-input {
+  width: 100%;
+  min-width: 150px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-light);
+  background: var(--surface-white);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+}
+
+.att-remarks-input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 99, 71, 0.1);
+}
+
+.att-empty {
+  text-align: center;
+  padding: 28px 16px;
+  color: var(--text-muted);
+}
+
+.att-empty .empty-icon {
+  font-size: 34px;
+  margin-bottom: 6px;
+}
+
+.att-empty h4 {
+  font-size: 15px;
+  margin-bottom: 6px;
+  color: var(--text-main);
+}
+
+.att-empty p {
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+.att-history-block {
+  margin-top: 6px;
+}
+
+.att-history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 14px;
+}
+
+.att-history-card {
+  background: var(--surface-white);
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.att-history-card.active-session {
+  border-color: var(--sage-primary);
+  box-shadow: 0 0 0 3px rgba(59, 99, 71, 0.12);
+}
+
+.att-history-date {
+  font-weight: 800;
+  font-size: 13.5px;
+}
+
+.att-history-counts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.att-mini-chip {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 14px;
+}
+
+.att-mini-chip.mini-present { background: var(--sage-light); color: var(--sage-text); }
+.att-mini-chip.mini-tardy { background: var(--honey-light); color: var(--honey-text); }
+.att-mini-chip.mini-excused { background: var(--surface-subtle); color: var(--text-main); }
+.att-mini-chip.mini-absent { background: var(--terracotta-light); color: var(--terracotta-text); }
+
+.att-history-rate {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.att-history-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* 🖨️ SF2 Print Sheet (mirror of the FS sign-off print pattern) */
+
+.att-print-document {
+  font-family: 'Times New Roman', Times, serif;
+  color: #111 !important;
+  line-height: 1.4;
+}
+
+.att-print-document .print-header {
+  text-align: center;
+  border-bottom: 2px solid #000;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.att-print-document .print-header h2 {
+  font-size: 17px;
+  margin: 4px 0;
+}
+
+.att-print-document .print-header h3 {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.att-print-document .course-subtitle {
+  font-size: 12px;
+  font-style: italic;
+}
+
+.att-print-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 24px;
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+
+.att-print-document table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+}
+
+.att-print-document th,
+.att-print-document td {
+  border: 1px solid #000;
+  padding: 5px 8px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.att-print-document th {
+  background: #EEE !important;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+}
+
+.att-print-summary {
+  margin-top: 12px;
+  font-size: 12px;
+  border: 1px solid #000;
+  padding: 8px 12px;
+}
+
+.att-print-signatures {
+  display: flex;
+  justify-content: space-between;
+  gap: 40px;
+  margin-top: 48px;
+}
+
+.att-print-signatures .sig-item {
+  flex: 1;
+  text-align: center;
+  font-size: 11.5px;
+}
+
+.att-print-signatures .line {
+  border-top: 1px solid #000;
+  margin-bottom: 4px;
+}
+
+@media print {
+  body.printing-sf2-sheet {
+    background: #FFF !important;
+    color: #000 !important;
+  }
+
+  body.printing-sf2-sheet .main-content,
+  body.printing-sf2-sheet .app-header,
+  body.printing-sf2-sheet .spark-banner,
+  body.printing-sf2-sheet .app-footer,
+  body.printing-sf2-sheet .modal-backdrop,
+  body.printing-sf2-sheet .pedagogo-toast-container {
+    display: none !important;
+  }
+
+  body.printing-sf2-sheet #att-print-sheet {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 24px;
+    background: #FFF !important;
+    color: #000 !important;
+  }
+}
+
+

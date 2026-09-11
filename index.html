@@ -96,6 +96,10 @@
               <span class="tab-icon">⏱️</span>
               <span>Practicum &amp; DTR</span>
             </button>
+            <button class="nav-tab" data-tab="attendance" data-perspective="EDUCATOR" id="tab-attendance">
+              <span class="tab-icon">📋</span>
+              <span>Daily Attendance</span>
+            </button>
 
             <!-- Shared Utility Tab -->
             <button class="nav-tab" data-tab="sync" data-perspective="ALL" id="tab-sync">
@@ -842,6 +846,11 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <!-- VIEW 6: DepEd SF2 Daily Attendance Tracker (rendered dynamically via AttendanceTracker) -->
+      <section class="tab-view" id="view-attendance">
+        <!-- Injected via AttendanceTracker module -->
       </section>
 
       <!-- VIEW 5: Sync with Phone (QR Scan-to-Sync) -->
