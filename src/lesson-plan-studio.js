@@ -3,6 +3,7 @@
  * Designed for Education Students & Pre-Service Teachers
  * Official DepEd K-12 & MATATAG Standards Alignment
  */
+import { showToast } from './toast.js';
 
 export class LessonPlanStudio {
   constructor() {
@@ -523,6 +524,7 @@ export class LessonPlanStudio {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    showToast('Exported DepEd Lesson Plan (.doc) for Word & Google Docs!', 'success');
   }
 
   loadSamplePlan() {
@@ -559,6 +561,6 @@ export class LessonPlanStudio {
     });
 
     this.saveCurrentPlan();
-    alert('🌿 Sample DepEd MATATAG / 4As Lesson Plan loaded! Click "📄 Export Word (.doc)" to download or "🖨️ Print / PDF" to print.');
+    showToast('Sample DepEd MATATAG / 4As Lesson Plan loaded!', 'success');
   }
 }

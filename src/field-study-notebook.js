@@ -256,6 +256,9 @@ export class FieldStudyNotebook {
           this.entries = this.entries.filter(e => e.id !== id);
           this.saveEntries();
           this.render();
+          if (typeof window.showToast === 'function') {
+            window.showToast('Observation log removed.', 'info');
+          }
         }
       });
     });
@@ -474,6 +477,9 @@ export class FieldStudyNotebook {
       this.saveEntries();
       closeModal();
       this.render();
+      if (typeof window.showToast === 'function') {
+        window.showToast(`Logged observation: "${episodeTitle}"`, 'success');
+      }
     });
   }
 

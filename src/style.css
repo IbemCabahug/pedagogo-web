@@ -4340,3 +4340,89 @@ body.dark-mode .inventory-status {
   flex: 1 1 200px;
   justify-content: center;
 }
+
+/* =========================================================
+   Pedagogical Toast Notifications System
+   ========================================================= */
+
+.pedagogo-toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 420px;
+  width: calc(100% - 48px);
+  pointer-events: none;
+}
+
+.pedagogo-toast {
+  pointer-events: auto;
+  background: var(--surface-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-main);
+  opacity: 0;
+  transform: translateY(16px) scale(0.96);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  backdrop-filter: blur(8px);
+}
+
+.pedagogo-toast.toast-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.pedagogo-toast.toast-hiding {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.96);
+}
+
+.toast-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.toast-content {
+  flex: 1;
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: var(--transition);
+  line-height: 1;
+}
+
+.toast-close:hover {
+  color: var(--text-main);
+  background: var(--surface-white);
+}
+
+.pedagogo-toast.toast-success {
+  border-left: 4px solid var(--sage-primary);
+}
+
+.pedagogo-toast.toast-warning {
+  border-left: 4px solid #D98326;
+}
+
+.pedagogo-toast.toast-celebrate {
+  border-left: 4px solid #BF5F3E;
+}
+

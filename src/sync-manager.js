@@ -5,6 +5,7 @@
  */
 import QRCode from 'qrcode';
 import Peer from 'peerjs';
+import { showToast } from './toast.js';
 
 const PeerClass = Peer?.Peer || Peer;
 
@@ -181,7 +182,7 @@ export class SyncManager {
         const data = JSON.parse(e.target.result);
         this.handleIncomingPayload(data);
       } catch (err) {
-        alert('Invalid file format. Please drop a valid Pedagogo JSON or .pedagogo backup file.');
+        showToast('Invalid file format. Please drop a valid Pedagogo JSON or .pedagogo backup file.', 'warning');
       }
     };
     reader.readAsText(file);
@@ -218,13 +219,13 @@ export class SyncManager {
         }
 
         const summary = data.summary || {};
-        alert(`🌿 Pedagogo Desk Archive Restored!\n\n` +
-          `• ${summary.flashcards ?? '?'} LET Flashcards\n` +
-          `• ${summary.fieldStudyEntries ?? '?'} Field Study Episodes\n` +
-          `• ${summary.tasks ?? '?'} Tasks & IMs\n` +
-          `• ${summary.classrooms ?? '?'} Classroom Sections\n` +
-          `• ${summary.subjects ?? '?'} Subjects & Timetable Slots\n\n` +
-          `All views have been seamlessly refreshed without losing page state.`);
+        showToast(
+          `Pedagogo Desk Archive Restored!\n` +
+          `• ${summary.flashcards ?? 0} LET Flashcards • ${summary.fieldStudyEntries ?? 0} FS Episodes\n` +
+          `• ${summary.tasks ?? 0} Tasks • ${summary.classrooms ?? 0} Classes • ${summary.subjects ?? 0} Subjects`,
+          'success',
+          5500
+        );
         return;
       }
 
@@ -240,14 +241,14 @@ export class SyncManager {
 
         window.dispatchEvent(new CustomEvent('pedagogo:data-restored', { detail: { stores: { pedagogo_schedule: data } } }));
 
-        alert(`🌿 Schedule data received! Updated ${data.subjects ? data.subjects.length : 0} subjects and schedule slots.`);
+        showToast(`Schedule data received! Updated ${data.subjects ? data.subjects.length : 0} subjects.`, 'success');
         return;
       }
 
-      alert('Unrecognized backup format. Please select a valid Pedagogo backup.');
+      showToast('Unrecognized backup format. Please select a valid Pedagogo backup.', 'warning');
     } catch (e) {
       console.error('Failed to parse incoming payload:', e);
-      alert('Could not parse file. Please verify it is a valid Pedagogo backup.');
+      showToast('Could not parse file. Please verify it is a valid Pedagogo backup.', 'warning');
     }
   }
 
@@ -312,6 +313,7 @@ export class SyncManager {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    showToast('Full system backup archive downloaded safely!', 'success');
   }
 
   /**
@@ -329,6 +331,7 @@ export class SyncManager {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    showToast('Schedule exported for phone sync!', 'success');
   }
 
   renderBackupStats() {

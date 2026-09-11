@@ -5,6 +5,7 @@
 
 import { DocumentParser } from './document-parser.js';
 import { DocumentSummarizer } from './document-summarizer.js';
+import { showToast } from './toast.js';
 
 export class DocumentDesk {
   constructor() {
@@ -17,7 +18,6 @@ export class DocumentDesk {
     this.container = document.getElementById('view-reading-desk');
     if (this.container) {
       this.render();
-      this.bindEvents();
     }
   }
 
@@ -536,9 +536,10 @@ export class DocumentDesk {
       this.activeSubTab = 'synthesis';
       this.hideLoading();
       this.render();
+      showToast(`Document "${extractedDoc.filename}" analyzed successfully!`, 'success');
     } catch (err) {
       this.hideLoading();
-      alert(`Could not process document: ${err.message}`);
+      showToast(`Could not process document: ${err.message}`, 'warning');
     }
   }
 
@@ -657,6 +658,7 @@ export class DocumentDesk {
         DocumentSummarizer.setApiKey(inputKey.value);
         closeModal();
         this.render();
+        showToast('Gemini Flash API Key saved! Full pedagogical auto-summarization is active.', 'success');
       });
     }
 
@@ -665,6 +667,7 @@ export class DocumentDesk {
         DocumentSummarizer.setApiKey('');
         closeModal();
         this.render();
+        showToast('Gemini API Key removed. Offline mode active.', 'info');
       });
     }
   }

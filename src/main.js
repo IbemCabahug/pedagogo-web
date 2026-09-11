@@ -11,6 +11,7 @@ import { TaskStudio } from './task-studio.js';
 import { DocumentDesk } from './document-desk.js';
 import { ReviewerStudio } from './reviewer-studio.js';
 import { FieldStudyNotebook } from './field-study-notebook.js';
+import { showToast } from './toast.js';
 
 class PedagogoDeskApp {
   constructor() {
@@ -565,11 +566,11 @@ FEMALE
       btnConfirmBulk.addEventListener('click', () => {
         const parsed = updateBulkPreview();
         if (!parsed || parsed.length === 0) {
-          alert('Please paste or enter at least one student name.');
+          showToast('Please paste or enter at least one student name.', 'warning');
           return;
         }
         if (!this.classManager.selectedClassId) {
-          alert('Please create or select an active class first.');
+          showToast('Please create or select an active class first.', 'warning');
           return;
         }
 
@@ -831,7 +832,7 @@ FEMALE
   printClipboardSheet() {
     const activeClass = this.classManager.getClassroom(this.classManager.selectedClassId);
     if (!activeClass) {
-      alert('Please select an active class first to print clipboard sheet.');
+      showToast('Please select an active class first to print clipboard sheet.', 'warning');
       return;
     }
 
@@ -970,7 +971,7 @@ FEMALE
             (completedMode) => {
               this.updateTimerControlsState(false);
               const isFocus = completedMode === 'FOCUS';
-              alert(isFocus ? '🎉 Splendid work! Your 25-minute study block is complete. Stretch and take a restorative breath.' : '☕ Rest break complete! Ready to nurture your next task?');
+              showToast(isFocus ? 'Splendid work! Your 25-minute study block is complete. Stretch and take a restorative breath.' : 'Rest break complete! Ready to nurture your next task?', 'celebrate', 6000);
               if (isFocus && btnModeBreak) {
                 btnModeBreak.click();
               } else if (btnModeFocus) {

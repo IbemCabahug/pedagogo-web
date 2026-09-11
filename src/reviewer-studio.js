@@ -2,6 +2,7 @@
  * Pedagogo Desk: Licensure (LET) Flashcard & Mastery Studio 🎯📚
  * Grounded in Spaced Repetition (Leitner System) and Active Retrieval.
  */
+import { showToast } from './toast.js';
 
 export class ReviewerStudio {
   static STORAGE_KEY = 'pedagogo_let_cards';
@@ -25,7 +26,6 @@ export class ReviewerStudio {
     this.container = document.getElementById('view-reviewer');
     if (this.container) {
       this.render();
-      this.bindEvents();
     }
   }
 
@@ -367,7 +367,7 @@ export class ReviewerStudio {
   renderMockQuizArena() {
     const mcqCards = this.cards.filter(c => c.type === 'SCENARIO_MCQ' && c.options && c.options.length > 0);
     if (mcqCards.length === 0) {
-      alert('No scenario multiple-choice questions found in deck. Add or generate questions from the Reading Desk first!');
+      showToast('No scenario multiple-choice questions found in deck. Add or generate questions from the Reading Desk first!', 'warning');
       this.activeMode = 'DECK';
       this.render();
       return;
@@ -713,7 +713,7 @@ export class ReviewerStudio {
       const back = document.getElementById('modal-card-back').value.trim();
 
       if (!front || !back) {
-        alert('Please fill in both the Front and Back of the card.');
+        showToast('Please fill in both the Front and Back of the card.', 'warning');
         return;
       }
 
@@ -733,6 +733,7 @@ export class ReviewerStudio {
       this.saveCards();
       closeModal();
       this.render();
+      showToast('New flashcard created and added to Leitner Box 1!', 'success');
     });
   }
 
@@ -764,6 +765,7 @@ export class ReviewerStudio {
 
     this.saveCards();
     this.render();
+    showToast(`Saved ${addedCount} LET practice questions to your study deck!`, 'success');
     return addedCount;
   }
 
