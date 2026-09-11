@@ -2250,6 +2250,209 @@ body.dark-mode .badge-cat-exam { color: #C2A5DB; border-color: rgba(194, 165, 21
   margin-bottom: 18px;
 }
 
+/* =========================================================
+   Zen Fullscreen Focus Mode Styles
+   ========================================================= */
+
+.zen-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background-color: var(--bg-parchment);
+  background-image: radial-gradient(circle at 50% 30%, rgba(59, 99, 71, 0.08) 0%, transparent 70%);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 28px 32px;
+  overflow-y: auto;
+  transition: opacity 0.3s ease;
+}
+
+body.dark-mode .zen-fullscreen-overlay {
+  background-image: radial-gradient(circle at 50% 30%, rgba(162, 207, 169, 0.08) 0%, transparent 70%);
+}
+
+.zen-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.zen-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--sage-primary);
+}
+
+.btn-zen-exit {
+  background: var(--surface-card);
+  border: 1px solid var(--border-light);
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-main);
+  transition: var(--transition);
+}
+
+.btn-zen-exit:hover {
+  border-color: var(--sage-primary);
+  background: var(--surface-white);
+}
+
+.zen-center-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: auto;
+  text-align: center;
+  gap: 16px;
+  max-width: 600px;
+  width: 100%;
+}
+
+.zen-task-banner {
+  margin-bottom: 4px;
+}
+
+.zen-task-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--sage-primary);
+  background: var(--sage-light);
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+.zen-task-title {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-top: 8px;
+  line-height: 1.35;
+}
+
+.zen-timer-container {
+  position: relative;
+  width: 240px;
+  height: 240px;
+  margin: 10px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zen-timer-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.zen-timer-bg {
+  fill: none;
+  stroke: var(--border-light);
+  stroke-width: 10;
+}
+
+.zen-timer-progress {
+  fill: none;
+  stroke: var(--sage-primary);
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-dasharray: 659.7;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.8s ease;
+}
+
+.zen-timer-display {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.zen-timer-digits {
+  font-size: 50px;
+  font-weight: 800;
+  font-family: var(--font-sans);
+  letter-spacing: -1.5px;
+  color: var(--text-main);
+}
+
+.zen-timer-status {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.zen-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+.zen-action-btn {
+  padding: 10px 24px;
+  font-size: 14px;
+  border-radius: 24px;
+}
+
+.zen-ambient-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.zen-ambient-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.zen-ambient-btn {
+  border: 1px solid var(--border-light);
+  background: var(--surface-card);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+  color: var(--text-main);
+  transition: var(--transition);
+}
+
+.zen-ambient-btn.active {
+  border-color: var(--sage-primary);
+  background: var(--sage-light);
+  color: var(--sage-text);
+}
+
+.zen-affirmation {
+  margin-top: 14px;
+  max-width: 480px;
+  font-style: italic;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  font-family: var(--font-serif);
+  line-height: 1.5;
+}
+
 /* Responsive adjustments */
 @media (max-width: 960px) {
   .today-grid,

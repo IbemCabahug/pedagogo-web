@@ -902,9 +902,101 @@ FEMALE
       });
     }
 
+    // 7. Zen Fullscreen Focus Mode
+    const btnZen = document.getElementById('btn-zen-fullscreen');
+    if (btnZen) {
+      btnZen.addEventListener('click', () => this.enterZenMode());
+    }
+
+    const btnZenExit = document.getElementById('btn-zen-exit');
+    if (btnZenExit) {
+      btnZenExit.addEventListener('click', () => this.exitZenMode());
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('zen-fullscreen-overlay')?.style.display !== 'none') {
+        this.exitZenMode();
+      }
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && document.getElementById('zen-fullscreen-overlay')?.style.display !== 'none') {
+        this.exitZenMode();
+      }
+    });
+
+    // Zen Timer Mirror Controls
+    const btnZenToggle = document.getElementById('btn-zen-timer-toggle');
+    if (btnZenToggle) {
+      btnZenToggle.addEventListener('click', () => {
+        document.getElementById('btn-timer-toggle')?.click();
+      });
+    }
+
+    const btnZenReset = document.getElementById('btn-zen-timer-reset');
+    if (btnZenReset) {
+      btnZenReset.addEventListener('click', () => {
+        document.getElementById('btn-timer-reset')?.click();
+      });
+    }
+
+    // Zen Ambient Sound Buttons
+    const zenAmbientBtns = document.querySelectorAll('.zen-ambient-btn');
+    zenAmbientBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.ambient;
+        const active = this.taskStudio.toggleAmbient(mode);
+
+        document.querySelectorAll('.btn-ambient, .zen-ambient-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.ambient === active);
+        });
+        const ambientBadge = document.getElementById('ambient-active-badge');
+        if (ambientBadge) {
+          ambientBadge.textContent = active === 'OFF' ? 'Off' : active;
+        }
+      });
+    });
+
     // Initial render
     this.renderTasksList();
     this.updateTimerDisplay();
+  }
+
+  enterZenMode() {
+    const overlay = document.getElementById('zen-fullscreen-overlay');
+    const zenTitle = document.getElementById('zen-task-title');
+    if (!overlay) return;
+
+    const allTasks = this.taskStudio.getAllTasks();
+    const focusTask = allTasks.find(t => t.id === this.taskStudio.selectedTaskIdForFocus) || allTasks.find(t => !t.completed);
+    if (zenTitle) {
+      zenTitle.textContent = focusTask ? `${focusTask.subjectCode} — ${focusTask.title}` : 'General Study & Reflection';
+    }
+
+    overlay.style.display = 'flex';
+    this.updateTimerDisplay();
+    this.updateTimerControlsState(this.taskStudio.isTimerRunning);
+
+    try {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    } catch (e) {
+      // Browser full screen fallback
+    }
+  }
+
+  exitZenMode() {
+    const overlay = document.getElementById('zen-fullscreen-overlay');
+    if (overlay) overlay.style.display = 'none';
+
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    } catch (e) {
+      // Browser exit fullscreen fallback
+    }
   }
 
   updateTimerControlsState(running) {
@@ -912,23 +1004,41 @@ FEMALE
     const label = document.getElementById('timer-toggle-label');
     const status = document.getElementById('timer-status-text');
 
+    const zenIcon = document.getElementById('zen-timer-toggle-icon');
+    const zenLabel = document.getElementById('zen-timer-toggle-label');
+    const zenStatus = document.getElementById('zen-timer-status');
+
     if (icon) icon.textContent = running ? '⏸️' : '▶️';
     if (label) label.textContent = running ? 'Pause' : (this.taskStudio.timerRemaining < this.taskStudio.timerDuration ? 'Resume' : 'Start Session');
     if (status) status.textContent = running ? (this.taskStudio.timerMode === 'FOCUS' ? 'Deep Study Flow' : 'Restorative Pause') : 'Paused';
+
+    if (zenIcon) zenIcon.textContent = running ? '⏸️' : '▶️';
+    if (zenLabel) zenLabel.textContent = running ? 'Pause' : (this.taskStudio.timerRemaining < this.taskStudio.timerDuration ? 'Resume' : 'Start Session');
+    if (zenStatus) zenStatus.textContent = running ? (this.taskStudio.timerMode === 'FOCUS' ? 'Deep Study Flow' : 'Restorative Pause') : 'Paused';
   }
 
   updateTimerDisplay() {
     const display = document.getElementById('timer-display');
     const circle = document.getElementById('timer-progress-circle');
-    if (display) {
-      display.textContent = this.taskStudio.formatTime(this.taskStudio.timerRemaining);
-    }
+    const zenDigits = document.getElementById('zen-timer-digits');
+    const zenCircle = document.getElementById('zen-timer-progress');
+
+    const formatted = this.taskStudio.formatTime(this.taskStudio.timerRemaining);
+    if (display) display.textContent = formatted;
+    if (zenDigits) zenDigits.textContent = formatted;
+
+    const percent = this.taskStudio.timerRemaining / this.taskStudio.timerDuration;
 
     if (circle) {
       const circumference = 2 * Math.PI * 70; // 439.82
-      const percent = this.taskStudio.timerRemaining / this.taskStudio.timerDuration;
       const offset = circumference * (1 - percent);
       circle.style.strokeDashoffset = offset;
+    }
+
+    if (zenCircle) {
+      const zenCircumference = 2 * Math.PI * 105; // 659.73
+      const zenOffset = zenCircumference * (1 - percent);
+      zenCircle.style.strokeDashoffset = zenOffset;
     }
   }
 

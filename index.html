@@ -199,6 +199,9 @@
                 <button class="btn-subtle timer-btn" id="btn-timer-reset" title="Reset Session">
                   🔄 Reset
                 </button>
+                <button class="btn-secondary timer-btn" id="btn-zen-fullscreen" title="Enter Zen Fullscreen Focus Mode">
+                  🔲 Zen Mode
+                </button>
               </div>
 
               <!-- Ambient Audio Synthesizer Controls -->
@@ -1109,6 +1112,63 @@ FEMALE
             <span id="breathing-seconds-left">60</span>s remaining
           </div>
           <button class="btn-subtle" id="btn-finish-breathing">Finished Centering</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ZEN FULLSCREEN FOCUS OVERLAY -->
+    <div class="zen-fullscreen-overlay" id="zen-fullscreen-overlay" style="display: none;">
+      <div class="zen-top-bar container">
+        <div class="zen-brand">
+          <span class="zen-icon">🌿</span>
+          <span class="zen-title">Pedagogo Zen Focus</span>
+        </div>
+        <button class="btn-zen-exit" id="btn-zen-exit" title="Exit Zen Fullscreen (or press Esc)">
+          <span>✕ Exit Zen Mode</span>
+        </button>
+      </div>
+
+      <div class="zen-center-content">
+        <div class="zen-task-banner">
+          <span class="zen-task-label">Now Nurturing</span>
+          <h2 class="zen-task-title" id="zen-task-title">Craft 4As Chart &amp; Motivation Flashcards</h2>
+        </div>
+
+        <!-- Huge Serene Circular Timer -->
+        <div class="zen-timer-container">
+          <svg class="zen-timer-svg" viewBox="0 0 240 240">
+            <circle class="zen-timer-bg" cx="120" cy="120" r="105"></circle>
+            <circle class="zen-timer-progress" id="zen-timer-progress" cx="120" cy="120" r="105"></circle>
+          </svg>
+          <div class="zen-timer-display">
+            <span class="zen-timer-digits" id="zen-timer-digits">25:00</span>
+            <span class="zen-timer-status" id="zen-timer-status">Deep Study Flow</span>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="zen-actions">
+          <button class="btn-primary zen-action-btn" id="btn-zen-timer-toggle">
+            <span id="zen-timer-toggle-icon">▶️</span> <span id="zen-timer-toggle-label">Start Session</span>
+          </button>
+          <button class="btn-subtle zen-action-btn" id="btn-zen-timer-reset">
+            🔄 Reset
+          </button>
+        </div>
+
+        <!-- Ambient Sound Switcher in Zen Mode -->
+        <div class="zen-ambient-bar">
+          <span class="zen-ambient-label">Ambient Soundscape:</span>
+          <div class="zen-ambient-pills">
+            <button class="zen-ambient-btn" data-ambient="RAIN" id="btn-zen-ambient-rain">🌧️ Rain</button>
+            <button class="zen-ambient-btn" data-ambient="BREEZE" id="btn-zen-ambient-breeze">🍃 Breeze</button>
+            <button class="zen-ambient-btn active" data-ambient="OFF" id="btn-zen-ambient-off">🔇 Mute</button>
+          </div>
+        </div>
+
+        <!-- Zen Affirmation -->
+        <div class="zen-affirmation">
+          <p id="zen-affirmation-text">“Your calm presence, mindful patience, and dedication are shaping future minds.”</p>
         </div>
       </div>
     </div>
