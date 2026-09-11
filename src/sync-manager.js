@@ -198,6 +198,8 @@ export class SyncManager {
         const stores = data.stores || {};
         let restoredCount = 0;
 
+        if (stores.pedagogo_tasks && !stores.pedagogo_academic_tasks) stores.pedagogo_academic_tasks = stores.pedagogo_tasks;
+        if (stores.pedagogo_flashcards && !stores.pedagogo_let_cards) stores.pedagogo_let_cards = stores.pedagogo_flashcards;
         Object.entries(stores).forEach(([key, val]) => {
           if (val !== undefined && val !== null) {
             localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
@@ -265,11 +267,11 @@ export class SyncManager {
     };
 
     const schedule = parseKey('pedagogo_schedule', this.getMockSchedule());
-    const tasks = parseKey('pedagogo_tasks', []);
+    const tasks = parseKey('pedagogo_academic_tasks', parseKey('pedagogo_tasks', []));
     const classrooms = parseKey('pedagogo_classrooms', []);
     const students = parseKey('pedagogo_students', []);
     const enrollments = parseKey('pedagogo_enrollments', []);
-    const flashcards = parseKey('pedagogo_flashcards', []);
+    const flashcards = parseKey('pedagogo_let_cards', parseKey('pedagogo_flashcards', []));
     const fsEntries = parseKey('pedagogo_fs_entries', []);
     const savedLp = parseKey('pedagogo_saved_lp', null);
     const readingHistory = parseKey('pedagogo_reading_history', []);
@@ -305,11 +307,11 @@ export class SyncManager {
       },
       stores: {
         pedagogo_schedule: schedule,
-        pedagogo_tasks: tasks,
+        pedagogo_academic_tasks: tasks,
         pedagogo_classrooms: classrooms,
         pedagogo_students: students,
         pedagogo_enrollments: enrollments,
-        pedagogo_flashcards: flashcards,
+        pedagogo_let_cards: flashcards,
         pedagogo_fs_entries: fsEntries,
         pedagogo_saved_lp: savedLp,
         pedagogo_reading_history: readingHistory,
@@ -372,9 +374,9 @@ export class SyncManager {
       }
     };
 
-    const flashcardsCount = countItems('pedagogo_flashcards');
+    const flashcardsCount = countItems('pedagogo_let_cards') || countItems('pedagogo_flashcards');
     const fsCount = countItems('pedagogo_fs_entries');
-    const tasksCount = countItems('pedagogo_tasks');
+    const tasksCount = countItems('pedagogo_academic_tasks') || countItems('pedagogo_tasks');
     const classesCount = countItems('pedagogo_classrooms');
     const subjectsCount = countItems('pedagogo_schedule');
 

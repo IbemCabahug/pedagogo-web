@@ -7,6 +7,7 @@ import { showToast } from './toast.js';
 
 export class ReviewerStudio {
   static STORAGE_KEY = 'pedagogo_let_cards';
+  static FLAGS_KEY = 'pedagogo_let_flags';
 
   constructor() {
     this.cards = this.loadCards();
@@ -28,7 +29,7 @@ export class ReviewerStudio {
     this.examDeck = [];
     this.examCurrentIndex = 0;
     this.userAnswers = {}; // { [cardId]: 'A' | 'B' | 'C' | 'D' }
-    this.flaggedQuestions = new Set(); // Set of card IDs
+    this.flaggedQuestions = this.loadFlags(); // Set of card IDs (persisted)
     this.examSecondsRemaining = 0;
     this.examTimerInterval = null;
     this.examIsPaused = false;
@@ -658,7 +659,6 @@ export class ReviewerStudio {
 
     this.examCurrentIndex = 0;
     this.userAnswers = {};
-    this.flaggedQuestions = new Set();
     this.examIsPaused = false;
     this.examStartTime = Date.now();
 
@@ -895,11 +895,7 @@ export class ReviewerStudio {
 
     // Flag toggle
     document.getElementById('btn-toggle-flag')?.addEventListener('click', () => {
-      if (this.flaggedQuestions.has(card.id)) {
-        this.flaggedQuestions.delete(card.id);
-      } else {
-        this.flaggedQuestions.add(card.id);
-      }
+      this.toggleFlag(card.id);
       this.renderExamArena();
     });
 
