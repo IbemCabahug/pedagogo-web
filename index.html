@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pedagogo Desk 🌿 — Peaceful Companion for Future Educators</title>
+  <meta name="description" content="A tranquil desktop sanctuary for education students to organize courses, draft 4As lesson plans, and sync seamlessly with the Pedagogo Android app.">
+  
+  <!-- Google Fonts: Plus Jakarta Sans & Lora -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..600;1,400..600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div id="app" class="app-layout">
+    <!-- Top Calm Navigation Bar -->
+    <header class="app-header">
+      <div class="header-inner container">
+        <div class="brand-group">
+          <div class="brand-icon">🌿</div>
+          <div class="brand-text">
+            <h1 class="brand-title">Pedagogo Desk</h1>
+            <span class="brand-badge">Calm Companion for Educators</span>
+          </div>
+        </div>
+
+        <nav class="nav-tabs" aria-label="Main Navigation">
+          <button class="nav-tab active" data-tab="today" id="tab-today">
+            <span class="tab-icon">☀️</span>
+            <span>Today's Rhythm</span>
+          </button>
+          <button class="nav-tab" data-tab="timetable" id="tab-timetable">
+            <span class="tab-icon">🗓️</span>
+            <span>Weekly Grid</span>
+          </button>
+          <button class="nav-tab" data-tab="lesson-studio" id="tab-lesson-studio">
+            <span class="tab-icon">📝</span>
+            <span>Lesson Plan Studio</span>
+          </button>
+          <button class="nav-tab" data-tab="sync" id="tab-sync">
+            <span class="tab-icon">📱</span>
+            <span>Sync with Phone</span>
+          </button>
+        </nav>
+
+        <div class="header-actions">
+          <button class="btn-icon" id="theme-toggle" title="Toggle Calm Theme" aria-label="Toggle Theme">
+            🌓
+          </button>
+          <div class="sync-indicator" id="sync-status-pill">
+            <span class="status-dot"></span>
+            <span id="sync-status-text">Local Storage</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content container">
+      <!-- Ambient Spark Banner -->
+      <section class="spark-banner" id="spark-banner">
+        <div class="spark-icon">✨</div>
+        <div class="spark-content">
+          <span class="spark-label">Teacher's Spark of the Day</span>
+          <p class="spark-quote" id="spark-quote">“Teaching is not the filling of a pail, but the lighting of a fire.”</p>
+          <span class="spark-author" id="spark-author">— William Butler Yeats</span>
+        </div>
+        <button class="btn-subtle" id="btn-refresh-spark" title="New inspiration">
+          🔄 <span>Shuffle</span>
+        </button>
+      </section>
+
+      <!-- VIEW 1: Today's Rhythm -->
+      <section class="tab-view active" id="view-today">
+        <div class="view-header">
+          <div>
+            <h2 class="section-title">Today's Rhythm</h2>
+            <p class="section-desc" id="current-date-display">Loading date...</p>
+          </div>
+          <button class="btn-primary" id="btn-quick-sync-today">
+            <span>📱 Sync with Mobile</span>
+          </button>
+        </div>
+
+        <div class="today-grid">
+          <!-- Next Up Hero Card -->
+          <div class="hero-card" id="next-up-card">
+            <!-- Dynamic Content Injected via JS -->
+          </div>
+
+          <!-- Rest of Today's Classes -->
+          <div class="sub-card today-schedule-card">
+            <div class="sub-card-header">
+              <h3>Today's Classes</h3>
+              <span class="chip" id="today-count-badge">0 classes</span>
+            </div>
+            <div class="class-list" id="today-class-list">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: Weekly Timetable -->
+      <section class="tab-view" id="view-timetable">
+        <div class="view-header">
+          <div>
+            <h2 class="section-title">Weekly Overview</h2>
+            <p class="section-desc">Big-picture curriculum & observation balance</p>
+          </div>
+          <div class="filter-pills">
+            <button class="filter-pill active" data-filter="ALL">All Categories</button>
+            <button class="filter-pill" data-filter="LECTURE">Lectures</button>
+            <button class="filter-pill" data-filter="FIELD_STUDY">Field Study (FS)</button>
+            <button class="filter-pill" data-filter="DEMO_TEACHING">Demo Teaching</button>
+            <button class="filter-pill" data-filter="PREP_TIME">Prep Time</button>
+          </div>
+        </div>
+
+        <div class="timetable-grid" id="weekly-grid-container">
+          <!-- 7 Day Columns Rendered via JS -->
+        </div>
+      </section>
+
+      <!-- VIEW 3: Lesson Plan Studio (4As Framework) -->
+      <section class="tab-view" id="view-lesson-studio">
+        <div class="view-header">
+          <div>
+            <h2 class="section-title">Calm Lesson Plan Studio</h2>
+            <p class="section-desc">4As Framework (Activity, Analysis, Abstraction, Application) with Bloom's Taxonomy</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn-secondary" id="btn-load-sample-lp">
+              <span>💡 Load Sample 4As</span>
+            </button>
+            <button class="btn-primary" id="btn-print-lp">
+              <span>🖨️ Print / Save as PDF</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="studio-layout">
+          <!-- Left: Bloom's Taxonomy Assistant -->
+          <aside class="blooms-sidebar">
+            <div class="sidebar-card">
+              <h3>🌸 Bloom's Taxonomy Verbs</h3>
+              <p class="sidebar-help">Click any verb to insert directly into your learning objectives:</p>
+              
+              <div class="blooms-categories" id="blooms-container">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+          </aside>
+
+          <!-- Right: 4As Editor -->
+          <div class="lp-editor-card" id="printable-lp-area">
+            <div class="lp-header-fields">
+              <div class="input-field">
+                <label for="lp-subject">Subject / Learning Area</label>
+                <input type="text" id="lp-subject" placeholder="e.g. English 8 (Afro-Asian Literature)" value="English 8">
+              </div>
+              <div class="input-field">
+                <label for="lp-topic">Topic / Lesson Focus</label>
+                <input type="text" id="lp-topic" placeholder="e.g. Recognizing Figures of Speech" value="Context Clues & Word Meanings">
+              </div>
+              <div class="input-field">
+                <label for="lp-target-grade">Grade Level & Section</label>
+                <input type="text" id="lp-target-grade" placeholder="e.g. Grade 8 - Sampaguita" value="Grade 8 - Rizal">
+              </div>
+              <div class="input-field">
+                <label for="lp-duration">Allotted Time</label>
+                <input type="text" id="lp-duration" placeholder="e.g. 60 Minutes" value="60 Minutes">
+              </div>
+            </div>
+
+            <div class="lp-section">
+              <div class="section-badge">I. Learning Objectives</div>
+              <textarea id="lp-objectives" rows="4" placeholder="By the end of the lesson, 85% of the students should be able to:&#10;1. Identify...&#10;2. Differentiate...&#10;3. Demonstrate..."></textarea>
+            </div>
+
+            <div class="lp-section">
+              <div class="section-badge">II. Subject Matter & Instructional Materials</div>
+              <textarea id="lp-materials" rows="3" placeholder="References: DepEd Curriculum Guide Grade 8...&#10;Materials: Flashcards, Manila Paper, Digital Slide Deck, Context Passages"></textarea>
+            </div>
+
+            <div class="lp-section">
+              <div class="section-badge">III. Procedure: The 4As Framework</div>
+              
+              <div class="four-as-group">
+                <div class="four-a-block">
+                  <span class="four-a-label">1. Activity (Engage & Hook)</span>
+                  <p class="four-a-hint">Games, picture prompts, diagnostic hook, or roleplay to spark learner curiosity.</p>
+                  <textarea id="lp-activity" rows="4" placeholder="Students participate in a 5-minute 'Mystery Word' game in pairs..."></textarea>
+                </div>
+
+                <div class="four-a-block">
+                  <span class="four-a-label">2. Analysis (Guiding Critical Questions)</span>
+                  <p class="four-a-hint">Questions that guide learners to discover the pattern and reflect on the activity.</p>
+                  <textarea id="lp-analysis" rows="4" placeholder="1. How did you determine the meaning of the unfamiliar words?&#10;2. What surrounding clues helped your group?"></textarea>
+                </div>
+
+                <div class="four-a-block">
+                  <span class="four-a-label">3. Abstraction (Core Concept & Generalization)</span>
+                  <p class="four-a-hint">Structured pedagogical delivery of definitions, rules, and concepts.</p>
+                  <textarea id="lp-abstraction" rows="5" placeholder="Teacher discusses the 4 Types of Context Clues: Definition, Synonyms, Antonyms, and Explanation..."></textarea>
+                </div>
+
+                <div class="four-a-block">
+                  <span class="four-a-label">4. Application (Hands-on Practice)</span>
+                  <p class="four-a-hint">Differentiated tasks, group exercises, or individual practice in authentic scenarios.</p>
+                  <textarea id="lp-application" rows="4" placeholder="Differentiated group tasks: Group 1 creates a dialogue, Group 2 illustrates a comic strip..."></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="lp-section">
+              <div class="section-badge">IV. Evaluation / Assessment</div>
+              <textarea id="lp-evaluation" rows="3" placeholder="Short 5-item formative quiz or rubric-based performance task..."></textarea>
+            </div>
+
+            <div class="lp-section">
+              <div class="section-badge">V. Assignment / Remediation</div>
+              <textarea id="lp-assignment" rows="2" placeholder="Write a 3-sentence journal entry using 2 new vocabulary words..."></textarea>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: Sync with Phone (QR Scan-to-Sync) -->
+      <section class="tab-view" id="view-sync">
+        <div class="view-header">
+          <div>
+            <h2 class="section-title">Peer-to-Peer QR Sync</h2>
+            <p class="section-desc">Zero cloud database cost • Direct phone-to-browser handshake • 100% Private</p>
+          </div>
+        </div>
+
+        <div class="sync-workspace">
+          <!-- Live QR Box -->
+          <div class="qr-container-card">
+            <div class="qr-box">
+              <canvas id="sync-qr-canvas"></canvas>
+              <div class="qr-loading" id="qr-loading-spinner">
+                <div class="spinner"></div>
+                <p>Generating secure session key...</p>
+              </div>
+            </div>
+
+            <div class="qr-meta">
+              <span class="meta-label">Session Pairing Code:</span>
+              <code class="session-code" id="session-code-display">Connecting...</code>
+              <button class="btn-subtle" id="btn-refresh-session">🔄 Generate New Code</button>
+            </div>
+
+            <div class="qr-instructions">
+              <h4>📱 How to sync in 3 seconds:</h4>
+              <ol>
+                <li>Open <strong>Pedagogo</strong> on your Android phone.</li>
+                <li>Tap the <strong>Sync to Web</strong> button in the top bar.</li>
+                <li>Point your camera at this QR code.</li>
+                <li>Your subjects and schedule will immediately beam onto this desktop!</li>
+              </ol>
+            </div>
+          </div>
+
+          <!-- Fallback Options Card -->
+          <div class="sub-card fallback-sync-card">
+            <h3>📂 Alternative Transfer (Zero Network Needed)</h3>
+            <p class="fallback-desc">If you are in a campus area without internet or Wi-Fi, you can drop your exported backup file here directly:</p>
+
+            <div class="dropzone" id="file-dropzone">
+              <div class="dropzone-icon">📥</div>
+              <p><strong>Drag & Drop</strong> your <code>pedagogo-backup.json</code> here</p>
+              <span class="dropzone-or">or</span>
+              <label class="btn-secondary file-upload-btn">
+                <span>Browse File</span>
+                <input type="file" id="manual-file-input" accept=".json,.pedagogo" style="display: none;">
+              </label>
+            </div>
+
+            <hr class="divider">
+
+            <div class="export-box">
+              <h4>Export Web Data Back to Phone</h4>
+              <p>Made updates or added lesson plans on desktop? Export a bundle to restore on your phone:</p>
+              <button class="btn-secondary" id="btn-export-json">
+                <span>💾 Download Backup JSON</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="container footer-inner">
+        <p>🌿 <strong>Pedagogo</strong> — Dedicated to future teachers molding tomorrow's minds.</p>
+        <p class="footer-subtle">100% On-Device &amp; Peer-to-Peer • Zero Cloud Subscription Costs</p>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

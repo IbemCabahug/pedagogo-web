@@ -1,0 +1,1021 @@
+/* =========================================================
+   Pedagogo Desk: Calm Pedagogical Design Tokens & System
+   Built for Future Educators with Zero-Pressure Ergonomics
+   ========================================================= */
+
+:root {
+  /* Earthy Sage Forest */
+  --sage-primary: #3B6347;
+  --sage-primary-hover: #32543C;
+  --sage-light: #D6E9D8;
+  --sage-text: #132A1B;
+
+  /* Warm Terracotta */
+  --terracotta-secondary: #BF5F3E;
+  --terracotta-hover: #A64E30;
+  --terracotta-light: #FDE8E1;
+  --terracotta-text: #3E1B0F;
+
+  /* Morning Honey */
+  --honey-tertiary: #D98326;
+  --honey-light: #FFF0D6;
+  --honey-text: #381D00;
+
+  /* Education Category Badges */
+  --cat-lecture: #3B6347;
+  --cat-field-study: #2F6F80;
+  --cat-demo-teaching: #D4683B;
+  --cat-prep-time: #755B8C;
+
+  /* Parchment Backgrounds & Surfaces (Light Mode) */
+  --bg-parchment: #FAF8F3;
+  --surface-white: #FFFFFF;
+  --surface-card: #F4EFE6;
+  --surface-subtle: #EDE7DC;
+  --text-main: #242B25;
+  --text-muted: #5B665E;
+  --border-light: #DDD7CB;
+  --border-focus: #3B6347;
+
+  /* Shadows & Elevation */
+  --shadow-sm: 0 2px 8px rgba(35, 45, 38, 0.04);
+  --shadow-md: 0 6px 20px rgba(35, 45, 38, 0.07);
+  --shadow-lg: 0 12px 32px rgba(35, 45, 38, 0.1);
+
+  /* Typography */
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Lora', Georgia, serif;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Dark Chalkboard Mode */
+body.dark-mode {
+  --bg-parchment: #131714;
+  --surface-white: #19201B;
+  --surface-card: #222B24;
+  --surface-subtle: #2B372E;
+  --text-main: #E7EFE8;
+  --text-muted: #9AA79D;
+  --border-light: #344237;
+  --border-focus: #A2CFA9;
+
+  --sage-primary: #A2CFA9;
+  --sage-light: #244D31;
+  --sage-text: #E7EFE8;
+
+  --terracotta-secondary: #EE977B;
+  --terracotta-light: #4E2114;
+  --terracotta-text: #FDE8E1;
+
+  --honey-tertiary: #FBB86A;
+  --honey-light: #452400;
+  --honey-text: #FFF0D6;
+}
+
+/* =========================================================
+   Base & Resets
+   ========================================================= */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-parchment);
+  color: var(--text-main);
+  line-height: 1.55;
+  font-size: 15px;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* =========================================================
+   Header & Tabs
+   ========================================================= */
+
+.app-header {
+  background: var(--surface-white);
+  border-bottom: 1px solid var(--border-light);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(10px);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 72px;
+  gap: 20px;
+}
+
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.brand-icon {
+  font-size: 26px;
+  background: var(--sage-light);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+}
+
+.brand-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--text-main);
+}
+
+.brand-badge {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sage-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.nav-tabs {
+  display: flex;
+  gap: 6px;
+  background: var(--surface-card);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+}
+
+.nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.nav-tab:hover {
+  color: var(--text-main);
+}
+
+.nav-tab.active {
+  background: var(--surface-white);
+  color: var(--text-main);
+  box-shadow: var(--shadow-sm);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border-light);
+  background: var(--surface-card);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+}
+
+.btn-icon:hover {
+  background: var(--surface-white);
+  transform: translateY(-1px);
+}
+
+.sync-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--sage-light);
+  color: var(--sage-text);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background: #10B981;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #10B981;
+}
+
+/* =========================================================
+   Spark Banner
+   ========================================================= */
+
+.spark-banner {
+  background: var(--honey-light);
+  color: var(--honey-text);
+  border: 1px solid rgba(217, 131, 38, 0.2);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  margin: 24px 0 32px 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.spark-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.spark-content {
+  flex: 1;
+}
+
+.spark-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--honey-tertiary);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.spark-quote {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.spark-author {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+/* =========================================================
+   Tab Views & Layout
+   ========================================================= */
+
+.tab-view {
+  display: none;
+  animation: fadeIn 0.25s ease forwards;
+}
+
+.tab-view.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+
+.section-desc {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* =========================================================
+   Buttons & Chips
+   ========================================================= */
+
+.btn-primary {
+  background: var(--sage-primary);
+  color: #FFF;
+  border: none;
+  padding: 10px 20px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: var(--transition);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover {
+  background: var(--sage-primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--surface-white);
+  color: var(--text-main);
+  border: 1px solid var(--border-light);
+  padding: 10px 18px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: var(--transition);
+}
+
+.btn-secondary:hover {
+  background: var(--surface-card);
+  border-color: var(--text-muted);
+}
+
+.btn-subtle {
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: var(--surface-subtle);
+  color: var(--text-muted);
+}
+
+.badge-category {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.badge-LECTURE { background: rgba(59, 99, 71, 0.15); color: #3B6347; }
+.badge-FIELD_STUDY { background: rgba(47, 111, 128, 0.15); color: #2F6F80; }
+.badge-DEMO_TEACHING { background: rgba(212, 104, 59, 0.18); color: #D4683B; }
+.badge-PREP_TIME { background: rgba(117, 91, 140, 0.15); color: #755B8C; }
+
+/* =========================================================
+   View 1: Today's Rhythm Cards
+   ========================================================= */
+
+.today-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 24px;
+}
+
+.hero-card {
+  background: var(--sage-light);
+  color: var(--sage-text);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 280px;
+}
+
+.hero-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.hero-code {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.hero-title {
+  font-size: 16px;
+  font-weight: 500;
+  opacity: 0.9;
+  margin-bottom: 20px;
+}
+
+.hero-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.4);
+  padding: 12px 18px;
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+}
+
+body.dark-mode .hero-details {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.hero-details span {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.preflight-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preflight-chip {
+  background: rgba(255, 255, 255, 0.6);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: var(--transition);
+}
+
+body.dark-mode .preflight-chip {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.preflight-chip.checked {
+  background: var(--sage-primary);
+  color: #FFF;
+}
+
+.sub-card {
+  background: var(--surface-white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.sub-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.class-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.class-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--surface-card);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--sage-primary);
+}
+
+.class-meta h4 {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.class-meta p {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.class-time-block {
+  text-align: right;
+}
+
+.class-time-block .time-main {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.class-time-block .time-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* =========================================================
+   View 2: Weekly Timetable Grid
+   ========================================================= */
+
+.filter-pills {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-pill {
+  border: 1px solid var(--border-light);
+  background: var(--surface-white);
+  color: var(--text-muted);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.filter-pill.active {
+  background: var(--sage-primary);
+  color: #FFF;
+  border-color: var(--sage-primary);
+}
+
+.timetable-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 14px;
+}
+
+.day-column {
+  background: var(--surface-white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 480px;
+}
+
+.day-col-header {
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 8px;
+  text-align: center;
+}
+
+.day-name {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.day-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.slot-tile {
+  background: var(--surface-card);
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--sage-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.slot-tile .tile-code {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.slot-tile .tile-time {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.slot-tile .tile-room {
+  color: var(--sage-primary);
+  font-weight: 600;
+}
+
+/* =========================================================
+   View 3: Lesson Plan Studio (4As)
+   ========================================================= */
+
+.studio-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.blooms-sidebar {
+  position: sticky;
+  top: 96px;
+}
+
+.sidebar-card {
+  background: var(--surface-white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  padding: 22px;
+  box-shadow: var(--shadow-sm);
+}
+
+.sidebar-card h3 {
+  font-size: 16px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.sidebar-help {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.blooms-level-group {
+  margin-bottom: 14px;
+}
+
+.blooms-level-title {
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 6px;
+  color: var(--sage-primary);
+}
+
+.verbs-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.verb-chip {
+  background: var(--surface-card);
+  border: 1px solid var(--border-light);
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.verb-chip:hover {
+  background: var(--sage-primary);
+  color: #FFF;
+  border-color: var(--sage-primary);
+  transform: translateY(-1px);
+}
+
+.lp-editor-card {
+  background: var(--surface-white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  padding: 36px;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.lp-header-fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.input-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.input-field label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.input-field input,
+textarea {
+  font-family: var(--font-sans);
+  background: var(--surface-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text-main);
+  outline: none;
+  transition: var(--transition);
+  width: 100%;
+}
+
+.input-field input:focus,
+textarea:focus {
+  border-color: var(--sage-primary);
+  background: var(--surface-white);
+  box-shadow: 0 0 0 3px var(--sage-light);
+}
+
+.lp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.section-badge {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--sage-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.four-as-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 6px;
+}
+
+.four-a-block {
+  background: var(--surface-card);
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--terracotta-secondary);
+}
+
+.four-a-label {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--terracotta-secondary);
+  display: block;
+}
+
+.four-a-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 3px 0 10px 0;
+}
+
+/* =========================================================
+   View 4: QR Sync Workspace
+   ========================================================= */
+
+.sync-workspace {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.qr-container-card {
+  background: var(--surface-white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  padding: 32px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.qr-box {
+  background: #FFF;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--border-light);
+  width: 240px;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+#sync-qr-canvas {
+  width: 200px !important;
+  height: 200px !important;
+}
+
+.qr-loading {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--sage-light);
+  border-top-color: var(--sage-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.qr-meta {
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.session-code {
+  font-family: monospace;
+  font-size: 18px;
+  font-weight: 700;
+  background: var(--surface-card);
+  padding: 6px 16px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 2px;
+  color: var(--sage-primary);
+}
+
+.qr-instructions {
+  text-align: left;
+  background: var(--surface-card);
+  padding: 18px;
+  border-radius: var(--radius-md);
+  width: 100%;
+}
+
+.qr-instructions h4 {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.qr-instructions ol {
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fallback-sync-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.dropzone {
+  border: 2px dashed var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 36px 20px;
+  text-align: center;
+  background: var(--surface-card);
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.dropzone:hover {
+  border-color: var(--sage-primary);
+  background: var(--sage-light);
+}
+
+.dropzone-icon {
+  font-size: 36px;
+}
+
+.divider {
+  border: none;
+  height: 1px;
+  background: var(--border-light);
+}
+
+/* =========================================================
+   Footer
+   ========================================================= */
+
+.app-footer {
+  margin-top: 60px;
+  border-top: 1px solid var(--border-light);
+  padding: 24px 0;
+  background: var(--surface-white);
+  text-align: center;
+}
+
+.footer-inner p {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.footer-subtle {
+  font-size: 11.5px;
+  opacity: 0.75;
+  margin-top: 4px;
+}
+
+/* =========================================================
+   Print Styles for Lesson Plan Export
+   ========================================================= */
+
+@media print {
+  body {
+    background: #FFF !important;
+    color: #000 !important;
+  }
+
+  .app-header,
+  .spark-banner,
+  .blooms-sidebar,
+  .view-header .header-actions,
+  .app-footer,
+  .nav-tabs {
+    display: none !important;
+  }
+
+  .container {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .studio-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .lp-editor-card {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  .four-a-block {
+    border: 1px solid #CCC !important;
+    background: #FFF !important;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .today-grid,
+  .studio-layout,
+  .sync-workspace {
+    grid-template-columns: 1fr !important;
+  }
+
+  .timetable-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .nav-tabs {
+    overflow-x: auto;
+  }
+}
