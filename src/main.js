@@ -137,6 +137,8 @@ class PedagogoDeskApp {
     // 4. Reload Reviewer Studio
     if (this.reviewerStudio) {
       this.reviewerStudio.cards = this.reviewerStudio.loadCards();
+      this.reviewerStudio.flaggedQuestions = this.reviewerStudio.loadFlags();
+      this.reviewerStudio.logs = this.reviewerStudio.loadLogs();
       this.reviewerStudio.render();
     }
 
