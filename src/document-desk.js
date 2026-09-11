@@ -224,7 +224,17 @@ export class DocumentDesk {
     });
 
     html = html.replace(/### (5\. 🎯 Licensure[\s\S]*?)$/, (m, c) => {
-      return `<div class="pedagogical-card card-retrieval"><h3 class="card-header-retrieval">5. 🎯 Licensure (LET) Retrieval Practice</h3><div class="card-body-content retrieval-body">${this.renderInteractiveQuiz(c)}</div></div>`;
+      return `
+        <div class="pedagogical-card card-retrieval">
+          <div class="retrieval-header-bar">
+            <h3 class="card-header-retrieval">5. 🎯 Licensure (LET) Retrieval Practice</h3>
+            <button class="btn-primary btn-save-questions-to-reviewer" id="btn-save-questions-to-reviewer" title="Save these practice questions to your permanent LET reviewer deck">
+              <span>➕ Save Questions to Reviewer</span>
+            </button>
+          </div>
+          <div class="card-body-content retrieval-body">${this.renderInteractiveQuiz(c)}</div>
+        </div>
+      `;
     });
 
     return html;
@@ -420,6 +430,51 @@ export class DocumentDesk {
     if (btnPrint) {
       btnPrint.addEventListener('click', () => {
         window.print();
+      });
+    }
+
+    const btnSaveQuestions = document.getElementById('btn-save-questions-to-reviewer');
+    if (btnSaveQuestions) {
+      btnSaveQuestions.addEventListener('click', () => {
+        const md = this.currentAnalysis?.markdown || '';
+        const docTitle = this.currentDoc?.filename || 'Document Reading';
+        
+        // Extract question blocks
+        const qSection = md.split(/### 5\. 🎯 Licensure/i)[1] || '';
+        const rawQuestions = qSection.split(/\*\*Question \d+:\*\*/g).filter(b => b.trim().length > 0);
+        
+        const parsedQuestions = rawQuestions.map(block => {
+          const ansMatch = block.match(/\*\*Correct Answer:\*\*\s*([A-D])/i);
+          const rationaleMatch = block.match(/\*\*Pedagogical Rationalization:\*\*\s*([\s\S]*?)(?=(?:Question|$))/i);
+          const prompt = block.replace(/\*\*Correct Answer:\*\*[\s\S]*$/, '').trim();
+          
+          // Extract options
+          const options = [];
+          const optLines = block.match(/- [A-D]\) .+/g);
+          if (optLines) {
+            optLines.forEach(l => options.push(l.replace(/^- /, '')));
+          }
+
+          return {
+            prompt,
+            options,
+            correctAnswer: ansMatch ? ansMatch[1].toUpperCase() : 'A',
+            rationale: rationaleMatch ? rationaleMatch[1].trim() : 'Active recall practice'
+          };
+        });
+
+        const event = new CustomEvent('pedagogo:save-questions-to-reviewer', {
+          detail: {
+            questions: parsedQuestions,
+            title: docTitle
+          }
+        });
+        window.dispatchEvent(event);
+
+        btnSaveQuestions.innerHTML = '✓ <span>Saved to LET Reviewer!</span>';
+        setTimeout(() => {
+          btnSaveQuestions.innerHTML = '<span>➕ Save Questions to Reviewer</span>';
+        }, 2200);
       });
     }
 
