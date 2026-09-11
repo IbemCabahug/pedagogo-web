@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pedagogo Desk 🌿 — Peaceful Companion for Future Educators</title>
-  <meta name="description" content="A tranquil desktop sanctuary for education students to organize courses, draft 4As lesson plans, and sync seamlessly with the Pedagogo Android app.">
+  <meta name="description" content="A tranquil desktop sanctuary for education students to organize courses, draft 4As/7Es lesson plans, track practicum DTR hours, and sync seamlessly with the Pedagogo Android app.">
   
   <!-- Google Fonts: Plus Jakarta Sans & Lora -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -38,6 +38,14 @@
           <button class="nav-tab" data-tab="lesson-studio" id="tab-lesson-studio">
             <span class="tab-icon">📝</span>
             <span>Lesson Plan Studio</span>
+          </button>
+          <button class="nav-tab" data-tab="classrooms" id="tab-classrooms">
+            <span class="tab-icon">👥</span>
+            <span>Classrooms</span>
+          </button>
+          <button class="nav-tab" data-tab="practicum" id="tab-practicum">
+            <span class="tab-icon">⏱️</span>
+            <span>Practicum &amp; DTR</span>
           </button>
           <button class="nav-tab" data-tab="sync" id="tab-sync">
             <span class="tab-icon">📱</span>
@@ -124,16 +132,21 @@
         </div>
       </section>
 
-      <!-- VIEW 3: Lesson Plan Studio (4As Framework) -->
+      <!-- VIEW 3: Lesson Plan Studio (4As & 7Es Frameworks) -->
       <section class="tab-view" id="view-lesson-studio">
         <div class="view-header">
           <div>
             <h2 class="section-title">Calm Lesson Plan Studio</h2>
-            <p class="section-desc">4As Framework (Activity, Analysis, Abstraction, Application) with Bloom's Taxonomy</p>
+            <p class="section-desc">DepEd K-12 &amp; MATATAG-ready • 4As &amp; 7Es Frameworks with Bloom's Taxonomy</p>
           </div>
           <div class="header-actions">
+            <!-- Framework Selector Switcher -->
+            <div class="framework-switcher">
+              <button class="framework-btn active" id="btn-switch-4as" data-framework="4AS">4As Framework</button>
+              <button class="framework-btn" id="btn-switch-7es" data-framework="7ES">7Es Framework</button>
+            </div>
             <button class="btn-secondary" id="btn-load-sample-lp">
-              <span>💡 Load Sample 4As</span>
+              <span>💡 Load Sample</span>
             </button>
             <button class="btn-primary" id="btn-print-lp">
               <span>🖨️ Print / Save as PDF</span>
@@ -146,7 +159,7 @@
           <aside class="blooms-sidebar">
             <div class="sidebar-card">
               <h3>🌸 Bloom's Taxonomy Verbs</h3>
-              <p class="sidebar-help">Click any verb to insert directly into your learning objectives:</p>
+              <p class="sidebar-help">Click any action verb to insert into your learning objectives:</p>
               
               <div class="blooms-categories" id="blooms-container">
                 <!-- Injected via JS -->
@@ -154,8 +167,9 @@
             </div>
           </aside>
 
-          <!-- Right: 4As Editor -->
+          <!-- Right: Lesson Plan Editor Sheet -->
           <div class="lp-editor-card" id="printable-lp-area">
+            <!-- Document Meta Header -->
             <div class="lp-header-fields">
               <div class="input-field">
                 <label for="lp-subject">Subject / Learning Area</label>
@@ -166,69 +180,487 @@
                 <input type="text" id="lp-topic" placeholder="e.g. Recognizing Figures of Speech" value="Context Clues & Word Meanings">
               </div>
               <div class="input-field">
-                <label for="lp-target-grade">Grade Level & Section</label>
+                <label for="lp-target-grade">Grade Level &amp; Section</label>
                 <input type="text" id="lp-target-grade" placeholder="e.g. Grade 8 - Sampaguita" value="Grade 8 - Rizal">
               </div>
               <div class="input-field">
-                <label for="lp-duration">Allotted Time</label>
-                <input type="text" id="lp-duration" placeholder="e.g. 60 Minutes" value="60 Minutes">
+                <label for="lp-duration">Allotted Time &amp; Quarter</label>
+                <input type="text" id="lp-duration" placeholder="e.g. 60 Minutes • Quarter 1" value="60 Minutes • Quarter 1">
               </div>
             </div>
 
+            <!-- Curriculum Standards Alignment Section (MATATAG / K-12) -->
+            <div class="standards-box">
+              <div class="standards-title">🏛️ DepEd Curriculum Standards Alignment (K-12 / MATATAG)</div>
+              <div class="standards-grid">
+                <div class="input-field">
+                  <label for="lp-content-standard">Content Standard</label>
+                  <textarea id="lp-content-standard" rows="2" placeholder="The learner demonstrates communicative competence through his/ her understanding of literature and text types..."></textarea>
+                </div>
+                <div class="input-field">
+                  <label for="lp-perf-standard">Performance Standard</label>
+                  <textarea id="lp-perf-standard" rows="2" placeholder="The learner transfers learning by producing a multimedia presentation or collaborative output..."></textarea>
+                </div>
+                <div class="input-field span-2">
+                  <label for="lp-melc-code">Most Essential Learning Competency (MELC) &amp; Code</label>
+                  <input type="text" id="lp-melc-code" placeholder="e.g. Determine the meaning of words and expressions that reflect the local culture (EN8V-If-6)">
+                </div>
+              </div>
+            </div>
+
+            <!-- Objectives -->
             <div class="lp-section">
               <div class="section-badge">I. Learning Objectives</div>
-              <textarea id="lp-objectives" rows="4" placeholder="By the end of the lesson, 85% of the students should be able to:&#10;1. Identify...&#10;2. Differentiate...&#10;3. Demonstrate..."></textarea>
+              <textarea id="lp-objectives" rows="4" placeholder="By the end of the 60-minute session, 85% of learners are expected to:&#10;1. Identify...&#10;2. Differentiate...&#10;3. Demonstrate..."></textarea>
             </div>
 
+            <!-- Materials & References -->
             <div class="lp-section">
-              <div class="section-badge">II. Subject Matter & Instructional Materials</div>
-              <textarea id="lp-materials" rows="3" placeholder="References: DepEd Curriculum Guide Grade 8...&#10;Materials: Flashcards, Manila Paper, Digital Slide Deck, Context Passages"></textarea>
+              <div class="section-badge">II. Subject Matter &amp; Instructional Materials (IMs)</div>
+              <textarea id="lp-materials" rows="3" placeholder="References: DepEd English 8 Curriculum Guide...&#10;Materials: Word mystery envelopes, Manila paper, slide presentation, cue cards"></textarea>
             </div>
 
-            <div class="lp-section">
+            <!-- DYNAMIC PROCEDURE: 4As Container -->
+            <div class="lp-section procedure-container" id="procedure-4as-container">
               <div class="section-badge">III. Procedure: The 4As Framework</div>
-              
               <div class="four-as-group">
                 <div class="four-a-block">
-                  <span class="four-a-label">1. Activity (Engage & Hook)</span>
-                  <p class="four-a-hint">Games, picture prompts, diagnostic hook, or roleplay to spark learner curiosity.</p>
+                  <span class="four-a-label">1. Activity (Engage &amp; Hook)</span>
+                  <p class="four-a-hint">Games, picture prompts, diagnostic hooks, or pair activities to pique learner curiosity.</p>
                   <textarea id="lp-activity" rows="4" placeholder="Students participate in a 5-minute 'Mystery Word' game in pairs..."></textarea>
                 </div>
 
                 <div class="four-a-block">
                   <span class="four-a-label">2. Analysis (Guiding Critical Questions)</span>
-                  <p class="four-a-hint">Questions that guide learners to discover the pattern and reflect on the activity.</p>
-                  <textarea id="lp-analysis" rows="4" placeholder="1. How did you determine the meaning of the unfamiliar words?&#10;2. What surrounding clues helped your group?"></textarea>
+                  <p class="four-a-hint">Questions that guide learners to discover principles and analyze clues from the activity.</p>
+                  <textarea id="lp-analysis" rows="4" placeholder="1. How did you determine the meaning of the unfamiliar words?&#10;2. What surrounding context helped?"></textarea>
                 </div>
 
                 <div class="four-a-block">
-                  <span class="four-a-label">3. Abstraction (Core Concept & Generalization)</span>
-                  <p class="four-a-hint">Structured pedagogical delivery of definitions, rules, and concepts.</p>
-                  <textarea id="lp-abstraction" rows="5" placeholder="Teacher discusses the 4 Types of Context Clues: Definition, Synonyms, Antonyms, and Explanation..."></textarea>
+                  <span class="four-a-label">3. Abstraction (Core Concept &amp; Generalization)</span>
+                  <p class="four-a-hint">Structured pedagogical delivery of definitions, rules, and fundamental insights.</p>
+                  <textarea id="lp-abstraction" rows="5" placeholder="Teacher presents the 4 Types of Context Clues (Definition, Synonym, Antonym, Explanation)..."></textarea>
                 </div>
 
                 <div class="four-a-block">
                   <span class="four-a-label">4. Application (Hands-on Practice)</span>
-                  <p class="four-a-hint">Differentiated tasks, group exercises, or individual practice in authentic scenarios.</p>
-                  <textarea id="lp-application" rows="4" placeholder="Differentiated group tasks: Group 1 creates a dialogue, Group 2 illustrates a comic strip..."></textarea>
+                  <p class="four-a-hint">Differentiated tasks, group scenarios, or authentic creative practice.</p>
+                  <textarea id="lp-application" rows="4" placeholder="Differentiated group tasks: Group 1 writes a poem, Group 2 draws a comic strip..."></textarea>
                 </div>
               </div>
             </div>
 
-            <div class="lp-section">
-              <div class="section-badge">IV. Evaluation / Assessment</div>
-              <textarea id="lp-evaluation" rows="3" placeholder="Short 5-item formative quiz or rubric-based performance task..."></textarea>
+            <!-- DYNAMIC PROCEDURE: 7Es Container (Initially Hidden) -->
+            <div class="lp-section procedure-container" id="procedure-7es-container" style="display: none;">
+              <div class="section-badge">III. Procedure: The 7Es Constructivist Framework</div>
+              <div class="seven-es-group">
+                <div class="seven-e-block">
+                  <span class="seven-e-label">1. Elicit (Access Prior Knowledge)</span>
+                  <p class="four-a-hint">Determine what students already know about the topic through quick diagnostic questions.</p>
+                  <textarea id="lp-7e-elicit" rows="3" placeholder="Teacher asks: 'Have you ever encountered a word in a book that you had never seen before? What did you do?'"></textarea>
+                </div>
+
+                <div class="seven-e-block">
+                  <span class="seven-e-label">2. Engage (Captivate Curiosity)</span>
+                  <p class="four-a-hint">Hook the learners' attention with an intriguing scenario, video clip, or puzzle.</p>
+                  <textarea id="lp-7e-engage" rows="3" placeholder="Present a mysterious message written in an ancient cipher or context-rich puzzle..."></textarea>
+                </div>
+
+                <div class="seven-e-block">
+                  <span class="seven-e-label">3. Explore (Hands-on Investigation)</span>
+                  <p class="four-a-hint">Learners manipulate materials, test ideas, and investigate patterns collaboratively.</p>
+                  <textarea id="lp-7e-explore" rows="4" placeholder="Teams examine 4 sentences with foreign words and investigate the structural clues in pairs..."></textarea>
+                </div>
+
+                <div class="seven-e-block">
+                  <span class="seven-e-label">4. Explain (Clarify &amp; Define Concepts)</span>
+                  <p class="four-a-hint">Students describe their findings; teacher clarifies official definitions and rules.</p>
+                  <textarea id="lp-7e-explain" rows="4" placeholder="Students share their observations. Teacher introduces the formal taxonomy of context clues..."></textarea>
+                </div>
+
+                <div class="seven-e-block">
+                  <span class="seven-e-label">5. Elaborate (Extend Concept to New Situations)</span>
+                  <p class="four-a-hint">Deepen understanding by applying learned concepts in more complex, authentic settings.</p>
+                  <textarea id="lp-7e-elaborate" rows="3" placeholder="Students apply clue deduction to an authentic news article or scientific journal excerpt..."></textarea>
+                </div>
+
+                <div class="seven-e-block">
+                  <span class="seven-e-label">6. Evaluate (Formative Assessment)</span>
+                  <p class="four-a-hint">Assess learner grasp and self-reflection against initial learning objectives.</p>
+                  <textarea id="lp-7e-evaluate" rows="3" placeholder="Short formative 5-item assessment assessing mastery of clue categorization..."></textarea>
+                </div>
+
+                <div class="seven-e-block">
+                  <span class="seven-e-label">7. Extend (Real-World Enrichment)</span>
+                  <p class="four-a-hint">Challenge learners to connect the concept to daily life, family, or personal reading habits.</p>
+                  <textarea id="lp-7e-extend" rows="2" placeholder="Journal challenge: Find 1 unfamiliar word in your favorite song lyrics and annotate its clue."></textarea>
+                </div>
+              </div>
             </div>
 
+            <!-- Evaluation -->
+            <div class="lp-section">
+              <div class="section-badge">IV. Evaluation / Assessment</div>
+              <textarea id="lp-evaluation" rows="3" placeholder="5-item formative quiz administered via printed exit slips or rubric-based performance task..."></textarea>
+            </div>
+
+            <!-- Assignment -->
             <div class="lp-section">
               <div class="section-badge">V. Assignment / Remediation</div>
-              <textarea id="lp-assignment" rows="2" placeholder="Write a 3-sentence journal entry using 2 new vocabulary words..."></textarea>
+              <textarea id="lp-assignment" rows="2" placeholder="Write a short reflection in your notebook using 2 new vocabulary words..."></textarea>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- VIEW 4: Sync with Phone (QR Scan-to-Sync) -->
+      <!-- VIEW 4: Practicum & DTR (Daily Time Record) Tracker -->
+      <section class="tab-view" id="view-practicum">
+        <div class="view-header">
+          <div>
+            <h2 class="section-title">Practicum &amp; DTR Observation Hours</h2>
+            <p class="section-desc">Track Field Study (FS 1 &amp; 2) and Practice Teaching hours toward university clearance</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn-secondary" id="btn-load-sample-dtr">
+              <span>💡 Load Sample Logs</span>
+            </button>
+            <button class="btn-primary" id="btn-print-dtr">
+              <span>🖨️ Print DTR Sheet (For Signatures)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Practicum Summary Metrics -->
+        <div class="dtr-summary-grid">
+          <div class="dtr-metric-card highlight">
+            <div class="metric-top">
+              <span class="metric-title">Completed Hours</span>
+              <span class="metric-icon">🌿</span>
+            </div>
+            <div class="metric-number" id="dtr-logged-hours">0.0</div>
+            <div class="metric-sub" id="dtr-progress-percent">0% of target completed</div>
+            <div class="calm-progress-track">
+              <div class="calm-progress-fill" id="dtr-progress-bar" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <div class="dtr-metric-card">
+            <div class="metric-top">
+              <span class="metric-title">Target Requisite</span>
+              <span class="metric-icon">🎯</span>
+            </div>
+            <div class="metric-number">
+              <span id="dtr-target-hours">120</span> <span style="font-size: 14px; font-weight: 500;">hrs</span>
+            </div>
+            <div class="metric-sub">
+              Set target: 
+              <button class="chip-btn active" data-target="120">120 hrs (FS)</button>
+              <button class="chip-btn" data-target="360">360 hrs (Internship)</button>
+            </div>
+          </div>
+
+          <div class="dtr-metric-card">
+            <div class="metric-top">
+              <span class="metric-title">Remaining to Log</span>
+              <span class="metric-icon">🕊️</span>
+            </div>
+            <div class="metric-number" id="dtr-remaining-hours">120.0</div>
+            <div class="metric-sub">No pressure • Log at your own pace</div>
+          </div>
+
+          <div class="dtr-metric-card">
+            <div class="metric-top">
+              <span class="metric-title">Total Sessions</span>
+              <span class="metric-icon">📝</span>
+            </div>
+            <div class="metric-number" id="dtr-session-count">0</div>
+            <div class="metric-sub">Logged classroom observations</div>
+          </div>
+        </div>
+
+        <!-- DTR Main Workspace -->
+        <div class="dtr-workspace">
+          <!-- Add Log Entry Card -->
+          <div class="dtr-entry-card">
+            <h3>➕ Log Observation Session</h3>
+            <p class="sidebar-help">Add your observation, assisting hours, or demo sessions:</p>
+            
+            <form id="dtr-form" class="dtr-form">
+              <div class="form-row">
+                <div class="input-field">
+                  <label for="dtr-date">Observation Date</label>
+                  <input type="date" id="dtr-date" required>
+                </div>
+                <div class="input-field">
+                  <label for="dtr-hours">Credited Hours</label>
+                  <input type="number" id="dtr-hours" step="0.5" min="0.5" max="12" placeholder="e.g. 3.5" value="3.0" required>
+                </div>
+              </div>
+
+              <div class="input-field">
+                <label for="dtr-school">Partner / Cooperating School</label>
+                <input type="text" id="dtr-school" placeholder="e.g. Mabolo National High School" value="Mabolo National High School">
+              </div>
+
+              <div class="form-row">
+                <div class="input-field">
+                  <label for="dtr-grade">Grade &amp; Section Observed</label>
+                  <input type="text" id="dtr-grade" placeholder="e.g. Grade 8 - Sampaguita" value="Grade 8 - Rizal">
+                </div>
+                <div class="input-field">
+                  <label for="dtr-mentor">Cooperating Teacher (CT)</label>
+                  <input type="text" id="dtr-mentor" placeholder="e.g. Mrs. Elena Cruz" value="Mrs. Elena Cruz">
+                </div>
+              </div>
+
+              <div class="input-field">
+                <label for="dtr-activity-type">Role / Practicum Nature</label>
+                <select id="dtr-activity-type">
+                  <option value="Observation">Field Study 1: Classroom Observation</option>
+                  <option value="Assisting">Field Study 2: Teacher Assistantship</option>
+                  <option value="Demo Teaching">Demonstration Teaching (Mock or Final)</option>
+                  <option value="IMs Preparation">Instructional Materials (IMs) Workshop</option>
+                </select>
+              </div>
+
+              <div class="input-field">
+                <label for="dtr-takeaway">Brief Pedagogical Takeaway / Reflection</label>
+                <textarea id="dtr-takeaway" rows="2" placeholder="e.g. Noticed how the teacher used gentle hand gestures to regain student attention during noisy transitions..."></textarea>
+              </div>
+
+              <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+                <span>💾 Save to Daily Time Record</span>
+              </button>
+            </form>
+          </div>
+
+          <!-- DTR Log Table (Printable) -->
+          <div class="dtr-table-card" id="printable-dtr-area">
+            <div class="dtr-table-header">
+              <div>
+                <h3 id="dtr-sheet-title">Official Daily Time Record (DTR)</h3>
+                <p class="sidebar-help">Student Teacher Observation &amp; Participation Log</p>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="dtr-table" id="dtr-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Cooperating School</th>
+                    <th>Grade &amp; Section</th>
+                    <th>Activity</th>
+                    <th>Hours</th>
+                    <th>Mentor (CT)</th>
+                    <th class="no-print">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="dtr-table-body">
+                  <!-- Injected via JS -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Signatures area for print -->
+            <div class="dtr-signatures-area">
+              <div class="sig-block">
+                <div class="sig-line"></div>
+                <span>Pre-Service Teacher Signature</span>
+              </div>
+              <div class="sig-block">
+                <div class="sig-line"></div>
+                <span>Cooperating Teacher (CT) Signature</span>
+              </div>
+              <div class="sig-block">
+                <div class="sig-line"></div>
+                <span>College Practicum Supervisor</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: Classrooms & Learner Management -->
+      <section class="tab-view" id="view-classrooms">
+        <div class="view-header">
+          <div>
+            <h2 class="section-title">Classroom &amp; Learner Management 🌿</h2>
+            <p class="section-desc">Sections, PPST Learner Diversity Profiles, DepEd SF1 Alignment &amp; Clipboard Roll Call</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn-primary" id="btn-create-class-modal">
+              <span>➕ Create New Class / Section</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Class Selection / Overview Cards -->
+        <div class="classes-overview-bar" id="classes-overview-bar">
+          <div class="section-heading-sm">
+            <span>Your Active Teaching Sections</span>
+          </div>
+          <div class="class-cards-scroll" id="class-cards-container">
+            <!-- Rendered dynamically via ClassManager -->
+          </div>
+        </div>
+
+        <!-- Active Classroom Detail Hub -->
+        <div class="classroom-detail-hub" id="classroom-detail-hub">
+          <!-- Class Header Banner -->
+          <div class="class-hero-banner" id="class-hero-banner">
+            <div class="class-hero-main">
+              <div class="class-color-stripe" id="class-hero-stripe"></div>
+              <div class="class-hero-info">
+                <div class="class-code-badge-row">
+                  <span class="class-code-pill" id="class-hero-code">EDUC 101</span>
+                  <span class="class-section-pill" id="class-hero-section">Section 2A</span>
+                  <span class="class-grade-pill" id="class-hero-grade">College 2nd Year</span>
+                </div>
+                <h3 class="class-hero-title" id="class-hero-title">Introduction to Teaching</h3>
+                <p class="class-hero-meta" id="class-hero-meta">
+                  <span>📍 <span id="class-hero-school">College of Teacher Education</span></span>
+                  <span>🚪 <span id="class-hero-room">Room 204</span></span>
+                  <span>🗓️ <span id="class-hero-term">2026–2027 • 1st Semester</span></span>
+                </p>
+              </div>
+            </div>
+
+            <!-- Stats & Breakdown -->
+            <div class="class-hero-stats">
+              <div class="stat-pill">
+                <span class="stat-val" id="stat-total-learners">0</span>
+                <span class="stat-lbl">Learners</span>
+              </div>
+              <div class="stat-pill stat-male">
+                <span class="stat-val" id="stat-male-learners">0</span>
+                <span class="stat-lbl">👦 Male</span>
+              </div>
+              <div class="stat-pill stat-female">
+                <span class="stat-val" id="stat-female-learners">0</span>
+                <span class="stat-lbl">👧 Female</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Roster Toolbar -->
+          <div class="roster-toolbar">
+            <div class="roster-toolbar-left">
+              <button class="btn-primary" id="btn-add-student-modal">
+                <span>➕ Add Learner</span>
+              </button>
+              <button class="btn-secondary" id="btn-bulk-import-modal">
+                <span>📋 Smart Bulk Roster Importer</span>
+              </button>
+              <button class="btn-subtle active-toggle" id="btn-toggle-sf1">
+                <span>🇵🇭 DepEd SF1 Sort: <strong id="sf1-status-label">Active (Boys First)</strong></span>
+              </button>
+            </div>
+            <div class="roster-toolbar-right">
+              <button class="btn-secondary" id="btn-print-clipboard-roster" title="Print physical clipboard attendance sheet">
+                <span>🖨️ Print Clipboard Sheet</span>
+              </button>
+              <button class="btn-subtle" id="btn-edit-active-class" title="Edit Section details">
+                <span>✏️ Edit Class</span>
+              </button>
+              <button class="btn-subtle text-danger" id="btn-delete-active-class" title="Delete this section">
+                <span>🗑️</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Student Masterlist Table Container -->
+          <div class="sub-card roster-table-card">
+            <div class="table-responsive">
+              <table class="roster-table" id="roster-table">
+                <thead>
+                  <tr>
+                    <th style="width: 50px;">#</th>
+                    <th>Learner Full Name</th>
+                    <th style="width: 100px;">Sex</th>
+                    <th style="width: 150px;">LRN / ID</th>
+                    <th>Learner Diversity Accommodations &amp; Notes (PPST Domain 3)</th>
+                    <th style="width: 110px; text-align: center;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="roster-table-body">
+                  <!-- Injected via ClassManager -->
+                </tbody>
+              </table>
+            </div>
+
+            <div class="empty-roster-state" id="empty-roster-state" style="display: none;">
+              <div class="empty-icon">🌱</div>
+              <h4>No Learners Enrolled in this Section Yet</h4>
+              <p>Add learners individually or use the <strong>Smart Bulk Roster Importer</strong> to paste names directly from Messenger, Word, or Excel.</p>
+              <div class="empty-actions">
+                <button class="btn-primary" id="btn-empty-add-student">➕ Add First Student</button>
+                <button class="btn-secondary" id="btn-empty-bulk-import">📋 Paste Roster (40+ Names)</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PRINTABLE CLIPBOARD SHEET (Formatted for @media print) -->
+        <div class="printable-clipboard-sheet" id="printable-clipboard-sheet">
+          <div class="print-sf-header">
+            <div class="print-deped-title">
+              <h3>DEPED SCHOOL FORM 1 / CLASSROOM MASTER REGISTER</h3>
+              <p>Pre-Service Teacher Practicum Daily Roll Call &amp; Recitation Ledger</p>
+            </div>
+            <div class="print-meta-grid">
+              <div><strong>Subject:</strong> <span id="print-subj-text">-</span></div>
+              <div><strong>Section &amp; Grade:</strong> <span id="print-sec-text">-</span></div>
+              <div><strong>School Year / Term:</strong> <span id="print-sy-text">-</span></div>
+              <div><strong>School &amp; Room:</strong> <span id="print-room-text">-</span></div>
+              <div><strong>Pre-Service Teacher:</strong> ______________________</div>
+              <div><strong>Cooperating Teacher:</strong> ______________________</div>
+            </div>
+          </div>
+
+          <table class="print-roster-table" id="print-roster-table">
+            <thead>
+              <tr>
+                <th style="width: 25px;">#</th>
+                <th style="width: 200px;">Learner Full Name</th>
+                <th style="width: 40px;">Sex</th>
+                <th style="width: 90px;">LRN</th>
+                <th class="date-col">/</th>
+                <th class="date-col">/</th>
+                <th class="date-col">/</th>
+                <th class="date-col">/</th>
+                <th class="date-col">/</th>
+                <th class="date-col">/</th>
+                <th class="date-col">/</th>
+                <th class="date-col">/</th>
+                <th class="date-col">/</th>
+                <th class="date-col">/</th>
+                <th style="width: 100px;">Remarks</th>
+              </tr>
+            </thead>
+            <tbody id="print-roster-tbody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+
+          <div class="print-sf-footer">
+            <div class="sig-item">
+              <div class="line"></div>
+              <span>Pre-Service Teacher (Intern)</span>
+            </div>
+            <div class="sig-item">
+              <div class="line"></div>
+              <span>Cooperating Teacher (CT)</span>
+            </div>
+            <div class="sig-item">
+              <div class="line"></div>
+              <span>Date Generated</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 5: Sync with Phone (QR Scan-to-Sync) -->
       <section class="tab-view" id="view-sync">
         <div class="view-header">
           <div>
@@ -258,8 +690,8 @@
               <h4>📱 How to sync in 3 seconds:</h4>
               <ol>
                 <li>Open <strong>Pedagogo</strong> on your Android phone.</li>
-                <li>Tap the <strong>Sync to Web</strong> button in the top bar.</li>
-                <li>Point your camera at this QR code.</li>
+                <li>Tap the <strong>Sync with Web Desk</strong> button in the top bar.</li>
+                <li>Enter the session code above or share your backup file.</li>
                 <li>Your subjects and schedule will immediately beam onto this desktop!</li>
               </ol>
             </div>
@@ -268,11 +700,11 @@
           <!-- Fallback Options Card -->
           <div class="sub-card fallback-sync-card">
             <h3>📂 Alternative Transfer (Zero Network Needed)</h3>
-            <p class="fallback-desc">If you are in a campus area without internet or Wi-Fi, you can drop your exported backup file here directly:</p>
+            <p class="fallback-desc">If you are in a campus area without internet or Wi-Fi, drop your exported backup file here directly:</p>
 
             <div class="dropzone" id="file-dropzone">
               <div class="dropzone-icon">📥</div>
-              <p><strong>Drag & Drop</strong> your <code>pedagogo-backup.json</code> here</p>
+              <p><strong>Drag &amp; Drop</strong> your <code>pedagogo-backup.json</code> here</p>
               <span class="dropzone-or">or</span>
               <label class="btn-secondary file-upload-btn">
                 <span>Browse File</span>
@@ -293,6 +725,189 @@
         </div>
       </section>
     </main>
+
+    <!-- MODALS FOR CLASSROOM & LEARNER MANAGEMENT -->
+    <!-- MODAL 1: Create / Edit Class -->
+    <div class="modal-backdrop" id="modal-classroom" style="display: none;">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 id="modal-classroom-title">Create Teaching Section</h3>
+          <button class="btn-close-modal" id="btn-close-classroom-modal">&times;</button>
+        </div>
+        <form id="form-classroom" class="modal-form">
+          <input type="hidden" id="input-class-id">
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="input-class-code">Subject Code *</label>
+              <input type="text" id="input-class-code" placeholder="e.g. EDUC 101, ENG 8" required>
+            </div>
+            <div class="form-group flex-2">
+              <label for="input-class-title">Subject Title *</label>
+              <input type="text" id="input-class-title" placeholder="e.g. Introduction to Teaching" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="input-class-section">Section Name *</label>
+              <input type="text" id="input-class-section" placeholder="e.g. Section 2A, Grade 8 - Rizal" required>
+            </div>
+            <div class="form-group flex-1">
+              <label for="input-class-grade">Grade / Year Level</label>
+              <input type="text" id="input-class-grade" placeholder="e.g. Grade 8, Year 2">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="input-class-sy">School Year</label>
+              <input type="text" id="input-class-sy" placeholder="e.g. 2026–2027" value="2026–2027">
+            </div>
+            <div class="form-group flex-1">
+              <label for="input-class-term">Semester / Term</label>
+              <input type="text" id="input-class-term" placeholder="e.g. 1st Semester, Quarter 1" value="1st Semester">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group flex-2">
+              <label for="input-class-school">School / Campus Name</label>
+              <input type="text" id="input-class-school" placeholder="e.g. Mabolo National High School">
+            </div>
+            <div class="form-group flex-1">
+              <label for="input-class-room">Room Assigned</label>
+              <input type="text" id="input-class-room" placeholder="e.g. Room 204">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Color Accent</label>
+            <div class="color-picker-row">
+              <label class="color-radio"><input type="radio" name="class-color" value="#3B6347" checked><span style="background: #3B6347;"></span> Sage</label>
+              <label class="color-radio"><input type="radio" name="class-color" value="#BF5F3E"><span style="background: #BF5F3E;"></span> Terracotta</label>
+              <label class="color-radio"><input type="radio" name="class-color" value="#2F6F80"><span style="background: #2F6F80;"></span> Ocean</label>
+              <label class="color-radio"><input type="radio" name="class-color" value="#D98326"><span style="background: #D98326;"></span> Honey</label>
+              <label class="color-radio"><input type="radio" name="class-color" value="#755B8C"><span style="background: #755B8C;"></span> Plum</label>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="btn-cancel-classroom-modal">Cancel</button>
+            <button type="submit" class="btn-primary" id="btn-save-classroom">Save Section</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL 2: Add / Edit Student -->
+    <div class="modal-backdrop" id="modal-student" style="display: none;">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 id="modal-student-title">Add Learner to Class</h3>
+          <button class="btn-close-modal" id="btn-close-student-modal">&times;</button>
+        </div>
+        <form id="form-student" class="modal-form">
+          <input type="hidden" id="input-student-id">
+          <div class="form-row">
+            <div class="form-group flex-2">
+              <label for="input-student-lastname">Last Name *</label>
+              <input type="text" id="input-student-lastname" placeholder="e.g. Dela Cruz" required>
+            </div>
+            <div class="form-group flex-2">
+              <label for="input-student-firstname">First Name *</label>
+              <input type="text" id="input-student-firstname" placeholder="e.g. Juan Carlo" required>
+            </div>
+            <div class="form-group flex-1">
+              <label for="input-student-mi">M.I.</label>
+              <input type="text" id="input-student-mi" placeholder="M." maxlength="4">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="input-student-gender">Sex / Gender *</label>
+              <select id="input-student-gender" required>
+                <option value="Male">👦 Male</option>
+                <option value="Female">👧 Female</option>
+              </select>
+            </div>
+            <div class="form-group flex-2">
+              <label for="input-student-lrn">Learner Reference No. (LRN)</label>
+              <input type="text" id="input-student-lrn" placeholder="12-digit DepEd LRN (Optional)">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="input-student-biometric">Biometric ID (ZKTeco Machine ID)</label>
+              <input type="text" id="input-student-biometric" placeholder="e.g. 1001 (Optional)">
+            </div>
+            <div class="form-group flex-1">
+              <label for="input-student-rfid">RFID / Badge Serial</label>
+              <input type="text" id="input-student-rfid" placeholder="e.g. RF82931 (Optional)">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="input-student-notes">Pedagogical Accommodations &amp; Notes (PPST Domain 3)</label>
+            <input type="text" id="input-student-notes" placeholder="e.g. Visual learner • Sits in front row • Needs gentle recitation encouragement">
+            <span class="field-hint">Helps you teach the human learner, not just a row in a ledger.</span>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="btn-cancel-student-modal">Cancel</button>
+            <button type="submit" class="btn-primary" id="btn-save-student">Save Learner</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL 3: Smart Bulk Roster Importer -->
+    <div class="modal-backdrop" id="modal-bulk-roster" style="display: none;">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-header">
+          <div>
+            <h3>Smart Bulk Roster Importer 📋</h3>
+            <p class="modal-sub">Paste raw names directly from Messenger, Word, or Excel. The engine automatically parses and organizes your masterlist.</p>
+          </div>
+          <button class="btn-close-modal" id="btn-close-bulk-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="bulk-instructions">
+            <div class="instruction-tip">
+              💡 <strong>Supported formats:</strong>
+              <ul>
+                <li>Numbered lists: <code>1. Dela Cruz, Juan M.</code> or <code>1) Juan Dela Cruz</code></li>
+                <li>Excel Copy-Paste: <code>LastName [Tab] FirstName</code></li>
+                <li>Section headers: Place <code>MALE</code> or <code>FEMALE</code> above name blocks to automatically assign sex</li>
+                <li>Learner tags: <code>(Visual Learner)</code> or <code>(LRN: 1098234)</code></li>
+              </ul>
+            </div>
+            <div class="bulk-default-gender">
+              <label>Default Sex for names without headers:</label>
+              <select id="bulk-default-gender">
+                <option value="Male">👦 Male</option>
+                <option value="Female">👧 Female</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="textarea-bulk-roster">Paste Raw Roster Text Here:</label>
+            <textarea id="textarea-bulk-roster" rows="9" placeholder="MALE
+1. Abad, Joshua M. (Visual Learner)
+2. Bautista, Carl Gabriel
+3. Dela Cruz, Mark Angelo S.
+
+FEMALE
+1. Aquino, Princess Sarah B.
+2. Castro, Beatriz Maria L. (Front Row)"></textarea>
+          </div>
+
+          <div class="bulk-preview-bar" id="bulk-preview-bar">
+            <span>Live Detection: <strong id="bulk-parsed-count">0 learners ready to import</strong></span>
+            <div class="bulk-sample-btn-group">
+              <button type="button" class="btn-subtle btn-sm" id="btn-load-bulk-sample">Insert Sample Roster</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="btn-cancel-bulk-modal">Cancel</button>
+          <button type="button" class="btn-primary" id="btn-confirm-bulk-import">Import &amp; Enroll Learners</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Footer -->
     <footer class="app-footer">
