@@ -28,6 +28,7 @@ class PedagogoDeskApp {
 
     this.initTheme();
     this.initTabs();
+    this.initPerspective();
     this.initSpark();
     this.initTodayView();
 
@@ -118,6 +119,57 @@ class PedagogoDeskApp {
     document.querySelectorAll('.tab-view').forEach(v => {
       v.classList.toggle('active', v.id === `view-${tabKey}`);
     });
+  }
+
+  initPerspective() {
+    const savedPerspective = localStorage.getItem('pedagogo_perspective') || 'STUDENT';
+    this.setPerspective(savedPerspective, false);
+
+    const pillStudent = document.getElementById('pill-student');
+    const pillEducator = document.getElementById('pill-educator');
+
+    if (pillStudent) {
+      pillStudent.addEventListener('click', () => this.setPerspective('STUDENT'));
+    }
+    if (pillEducator) {
+      pillEducator.addEventListener('click', () => this.setPerspective('EDUCATOR'));
+    }
+  }
+
+  setPerspective(perspective, autoSwitchTab = true) {
+    this.currentPerspective = perspective;
+    localStorage.setItem('pedagogo_perspective', perspective);
+
+    const isStudent = perspective === 'STUDENT';
+    document.body.classList.toggle('perspective-student', isStudent);
+    document.body.classList.toggle('perspective-educator', !isStudent);
+
+    const pillStudent = document.getElementById('pill-student');
+    const pillEducator = document.getElementById('pill-educator');
+    if (pillStudent) {
+      pillStudent.classList.toggle('active', isStudent);
+      pillStudent.setAttribute('aria-selected', isStudent ? 'true' : 'false');
+    }
+    if (pillEducator) {
+      pillEducator.classList.toggle('active', !isStudent);
+      pillEducator.setAttribute('aria-selected', !isStudent ? 'true' : 'false');
+    }
+
+    // Dynamic brand badge update
+    const brandBadge = document.querySelector('.brand-badge');
+    if (brandBadge) {
+      brandBadge.textContent = isStudent ? '🎓 Student Sanctuary' : '🌿 Practicum Cockpit';
+    }
+
+    // Check if current tab is hidden in newly chosen perspective
+    if (autoSwitchTab) {
+      const activeTab = document.querySelector('.nav-tab.active');
+      const activePerspective = activeTab ? activeTab.dataset.perspective : 'ALL';
+      if (activePerspective !== 'ALL' && activePerspective !== perspective) {
+        const defaultTab = isStudent ? 'today' : 'classrooms';
+        this.switchTab(defaultTab);
+      }
+    }
   }
 
   initSpark() {

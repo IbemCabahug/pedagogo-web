@@ -26,32 +26,50 @@
           </div>
         </div>
 
+        <div class="perspective-switcher-wrapper">
+          <div class="perspective-switcher" id="perspective-switcher" role="tablist" aria-label="Perspective Switcher">
+            <button class="perspective-pill active" id="pill-student" data-perspective="STUDENT" role="tab" aria-selected="true" title="Switch to Student Life mode">
+              <span class="perspective-icon">🎓</span>
+              <span class="perspective-text">Student Life</span>
+            </button>
+            <button class="perspective-pill" id="pill-educator" data-perspective="EDUCATOR" role="tab" aria-selected="false" title="Switch to Practicum Educator mode">
+              <span class="perspective-icon">🌿</span>
+              <span class="perspective-text">Practicum Educator</span>
+            </button>
+          </div>
+        </div>
+
         <nav class="nav-tabs" aria-label="Main Navigation">
-          <button class="nav-tab active" data-tab="today" id="tab-today">
+          <!-- Student Life Tabs -->
+          <button class="nav-tab active" data-tab="today" data-perspective="STUDENT" id="tab-today">
             <span class="tab-icon">☀️</span>
             <span>Today's Rhythm</span>
           </button>
-          <button class="nav-tab" data-tab="tasks" id="tab-tasks">
+          <button class="nav-tab" data-tab="tasks" data-perspective="STUDENT" id="tab-tasks">
             <span class="tab-icon">🎯</span>
             <span>Tasks &amp; IMs</span>
           </button>
-          <button class="nav-tab" data-tab="timetable" id="tab-timetable">
+          <button class="nav-tab" data-tab="timetable" data-perspective="STUDENT" id="tab-timetable">
             <span class="tab-icon">🗓️</span>
             <span>Weekly Grid</span>
           </button>
-          <button class="nav-tab" data-tab="lesson-studio" id="tab-lesson-studio">
-            <span class="tab-icon">📝</span>
-            <span>Lesson Plan Studio</span>
-          </button>
-          <button class="nav-tab" data-tab="classrooms" id="tab-classrooms">
+
+          <!-- Practicum Educator Tabs -->
+          <button class="nav-tab" data-tab="classrooms" data-perspective="EDUCATOR" id="tab-classrooms">
             <span class="tab-icon">👥</span>
             <span>Classrooms</span>
           </button>
-          <button class="nav-tab" data-tab="practicum" id="tab-practicum">
+          <button class="nav-tab" data-tab="lesson-studio" data-perspective="EDUCATOR" id="tab-lesson-studio">
+            <span class="tab-icon">📝</span>
+            <span>Lesson Plan Studio</span>
+          </button>
+          <button class="nav-tab" data-tab="practicum" data-perspective="EDUCATOR" id="tab-practicum">
             <span class="tab-icon">⏱️</span>
             <span>Practicum &amp; DTR</span>
           </button>
-          <button class="nav-tab" data-tab="sync" id="tab-sync">
+
+          <!-- Shared Utility Tab -->
+          <button class="nav-tab" data-tab="sync" data-perspective="ALL" id="tab-sync">
             <span class="tab-icon">📱</span>
             <span>Sync with Phone</span>
           </button>

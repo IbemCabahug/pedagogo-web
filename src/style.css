@@ -159,6 +159,87 @@ body {
   letter-spacing: 0.6px;
 }
 
+/* =========================================================
+   Dual-Perspective Switcher (Student Life vs Practicum Educator)
+   ========================================================= */
+
+.perspective-switcher-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.perspective-switcher {
+  display: flex;
+  align-items: center;
+  background: var(--surface-subtle);
+  padding: 4px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-light);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
+  gap: 3px;
+  transition: var(--transition);
+}
+
+.perspective-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.perspective-pill .perspective-icon {
+  font-size: 14px;
+}
+
+.perspective-pill:hover {
+  color: var(--text-main);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+body.dark-mode .perspective-pill:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Active Student Mode Pill */
+body.perspective-student #pill-student,
+.perspective-pill.active[data-perspective="STUDENT"] {
+  background: var(--surface-white);
+  color: var(--sage-primary);
+  box-shadow: 0 2px 6px rgba(47, 93, 62, 0.12), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* Active Educator Mode Pill */
+body.perspective-educator #pill-educator,
+.perspective-pill.active[data-perspective="EDUCATOR"] {
+  background: var(--surface-white);
+  color: var(--terracotta-secondary);
+  box-shadow: 0 2px 6px rgba(212, 104, 59, 0.15), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+body.dark-mode .perspective-pill.active {
+  background: var(--surface-card);
+}
+
+/* Perspective Filtering for Navigation Tabs */
+body.perspective-student .nav-tab[data-perspective="EDUCATOR"] {
+  display: none !important;
+}
+
+body.perspective-educator .nav-tab[data-perspective="STUDENT"] {
+  display: none !important;
+}
+
 .nav-tabs {
   display: flex;
   gap: 6px;
