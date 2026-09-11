@@ -51,8 +51,21 @@ export class DocumentParser {
    */
   static async parsePdf(arrayBuffer, filename) {
     try {
+      // 1. Base64 encoding for direct multimodal Gemini ingestion (if under 20MB)
+      // Must be cloned/prepared before PDF.js transfers the buffer to its Web Worker
+      let base64Data = null;
+      try {
+        if (arrayBuffer && arrayBuffer.byteLength > 0 && arrayBuffer.byteLength <= 20 * 1024 * 1024) {
+          base64Data = this.arrayBufferToBase64(arrayBuffer.slice(0));
+        }
+      } catch (e) {
+        console.warn('Could not prepare multimodal PDF base64:', e);
+      }
+
+      // 2. Clone arrayBuffer before passing to PDF.js worker to prevent detachment of the main buffer
+      const pdfBytes = new Uint8Array(arrayBuffer.slice(0));
       const loadingTask = pdfjsLib.getDocument({
-        data: new Uint8Array(arrayBuffer),
+        data: pdfBytes,
         useSystemFonts: true
       });
       const pdf = await loadingTask.promise;
@@ -80,12 +93,6 @@ export class DocumentParser {
 
       const strippedContent = fullText.replace(/--- \[Page \d+ of \d+\] ---/g, '').trim();
       const hasSelectableText = strippedContent && strippedContent.length >= 10;
-
-      // Base64 encoding for direct multimodal Gemini ingestion (if under 20MB)
-      let base64Data = null;
-      if (arrayBuffer.byteLength <= 20 * 1024 * 1024) {
-        base64Data = this.arrayBufferToBase64(arrayBuffer);
-      }
 
       if (!hasSelectableText && !base64Data) {
         throw new Error(`No readable digital text could be extracted from "${filename}". This PDF appears to be a scanned photocopy without selectable text. Please upload a PDF with selectable text, a Word (.docx) file, or plain text.`);
@@ -269,7 +276,7 @@ export class DocumentParser {
   static async parseDocx(arrayBuffer, filename) {
     try {
       // Mammoth HTML conversion preserves headings and tables
-      const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
+      const htmlResult = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer.slice(0) });
       const html = htmlResult.value || '';
 
       const parser = new DOMParser();
@@ -325,7 +332,7 @@ export class DocumentParser {
 
       // If no sections were identified from HTML, fallback to raw text extraction
       if (units.length === 0) {
-        const rawResult = await mammoth.extractRawText({ arrayBuffer });
+        const rawResult = await mammoth.extractRawText({ arrayBuffer: arrayBuffer.slice(0) });
         const rawText = rawResult.value.trim();
         const paragraphs = rawText.split(/\n\s*\n/).filter(p => p.trim().length > 0);
         paragraphs.forEach((para, idx) => {
@@ -358,7 +365,7 @@ export class DocumentParser {
    */
   static async parsePptx(arrayBuffer, filename) {
     try {
-      const zip = await JSZip.loadAsync(arrayBuffer);
+      const zip = await JSZip.loadAsync(arrayBuffer.slice(0));
       const parser = new DOMParser();
 
       const slideEntries = Object.keys(zip.files).filter(name => /^ppt\/slides\/slide\d+\.xml$/i.test(name));
@@ -499,15 +506,22 @@ export class DocumentParser {
   }
 
   /**
-   * Chunk-safe ArrayBuffer to Base64 conversion that prevents browser call-stack overflow on large files.
+   * Chunk-safe ArrayBuffer / Uint8Array to Base64 conversion that prevents browser call-stack overflow on large files.
    */
   static arrayBufferToBase64(buffer) {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    const chunkSize = 0x8000; // 32KB chunks
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+    if (!buffer) return null;
+    try {
+      if (buffer.byteLength === 0) return null;
+      let binary = '';
+      const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+      const chunkSize = 0x8000; // 32KB chunks
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+      }
+      return btoa(binary);
+    } catch (e) {
+      console.warn('Could not encode buffer to base64:', e);
+      return null;
     }
-    return btoa(binary);
   }
 }

@@ -920,10 +920,16 @@ export class DocumentDesk {
     try {
       const extractedDoc = await DocumentParser.parseFile(file);
 
-      // Verify readable text was actually extracted
+      // Verify readable text was actually extracted or visual data is present for multimodal processing
       const cleanContent = (extractedDoc.rawText || '').replace(/--- \[Page \d+ of \d+\] ---/g, '').trim();
+      const hasVisualData = Boolean(extractedDoc.base64Data);
+
       if (!cleanContent || cleanContent.length < 5) {
-        throw new Error(`No readable digital text could be found in "${file.name}". If this is a scanned photocopy or image-only PDF, please upload a document with digital selectable text, or a Word (.docx) file.`);
+        if (hasVisualData) {
+          extractedDoc.rawText = `[Visual Educational Document: ${file.name}]\nVisual document prepared for multimodal pedagogical analysis.`;
+        } else {
+          throw new Error(`No readable digital text could be found in "${file.name}". If this is a scanned photocopy or image-only PDF, please upload a document with digital selectable text, or a Word (.docx) file.`);
+        }
       }
 
       this.updateLoadingDesc('Running 5-Part Pedagogical Synthesis (Cornell, Chunks, Feynman, Matrix, LET)...');
