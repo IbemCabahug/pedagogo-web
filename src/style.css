@@ -4272,5 +4272,71 @@ body.dark-mode .fs-form-divider span {
   }
 }
 
+/* =========================================================
+   Unified Offline Data Backup & Restore Hub Styles
+   ========================================================= */
 
+.backup-inventory-strip {
+  background: var(--surface-white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
 
+.inventory-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.inventory-status {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sage-primary);
+  background: var(--sage-light);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+body.dark-mode .inventory-status {
+  background: rgba(162, 207, 169, 0.15);
+  color: #A2CFA9;
+}
+
+.inventory-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inv-pill {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface-card);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+}
+
+.inv-pill strong {
+  color: var(--sage-primary);
+  font-weight: 800;
+}
+
+.backup-actions-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.backup-actions-group .btn-primary,
+.backup-actions-group .btn-secondary {
+  flex: 1 1 200px;
+  justify-content: center;
+}

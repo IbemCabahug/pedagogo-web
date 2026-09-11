@@ -329,8 +329,11 @@
             <button class="btn-secondary" id="btn-load-sample-lp">
               <span>💡 Load Sample</span>
             </button>
-            <button class="btn-primary" id="btn-print-lp">
-              <span>🖨️ Print / Save as PDF</span>
+            <button class="btn-primary" id="btn-export-docx-lp" title="Download editable Word document (.doc) for DepEd demo teaching">
+              <span>📄 Export Word (.doc)</span>
+            </button>
+            <button class="btn-subtle" id="btn-print-lp" title="Print preview or save as PDF">
+              <span>🖨️ Print / PDF</span>
             </button>
           </div>
         </div>
@@ -878,17 +881,22 @@
             </div>
           </div>
 
-          <!-- Fallback Options Card -->
+          <!-- Offline Data Backup & Restore Hub -->
           <div class="sub-card fallback-sync-card">
-            <h3>📂 Alternative Transfer (Zero Network Needed)</h3>
-            <p class="fallback-desc">If you are in a campus area without internet or Wi-Fi, drop your exported backup file here directly:</p>
+            <h3>💾 Offline Data Backup &amp; Restore Hub</h3>
+            <p class="fallback-desc">All your work is stored privately in your browser. Back up or restore your complete semester archive with zero cloud fees:</p>
+
+            <!-- Real-time Local Inventory Strip -->
+            <div class="backup-inventory-strip" id="backup-inventory-strip">
+              <!-- Rendered dynamically by SyncManager -->
+            </div>
 
             <div class="dropzone" id="file-dropzone">
               <div class="dropzone-icon">📥</div>
-              <p><strong>Drag &amp; Drop</strong> your <code>pedagogo-backup.json</code> here</p>
+              <p><strong>Drag &amp; Drop</strong> your <code>pedagogo-full-backup.json</code> here</p>
               <span class="dropzone-or">or</span>
               <label class="btn-secondary file-upload-btn">
-                <span>Browse File</span>
+                <span>Browse Backup File</span>
                 <input type="file" id="manual-file-input" accept=".json,.pedagogo" style="display: none;">
               </label>
             </div>
@@ -896,11 +904,16 @@
             <hr class="divider">
 
             <div class="export-box">
-              <h4>Export Web Data Back to Phone</h4>
-              <p>Made updates or added lesson plans on desktop? Export a bundle to restore on your phone:</p>
-              <button class="btn-secondary" id="btn-export-json">
-                <span>💾 Download Backup JSON</span>
-              </button>
+              <h4>Export Web Desk Data</h4>
+              <p>Download your complete desktop archive or export just the timetable for phone pairing:</p>
+              <div class="backup-actions-group">
+                <button class="btn-primary" id="btn-export-full-backup" title="Download all flashcards, field study logs, classes, tasks, and lesson plans">
+                  <span>💾 Download Full System Backup (.json)</span>
+                </button>
+                <button class="btn-secondary" id="btn-export-json" title="Download only the timetable schedule for phone pairing">
+                  <span>📱 Export Schedule for Phone</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

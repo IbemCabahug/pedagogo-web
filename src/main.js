@@ -53,6 +53,11 @@ class PedagogoDeskApp {
       }
     });
 
+    // Full Desk Data Restored Listener (from Unified Backup Hub)
+    window.addEventListener('pedagogo:data-restored', () => {
+      this.handleGlobalDataRestored();
+    });
+
     this.initClassroomUI();
     this.initTaskStudioUI();
 
@@ -61,6 +66,48 @@ class PedagogoDeskApp {
       btnQuickSync.addEventListener('click', () => {
         this.switchTab('sync');
       });
+    }
+  }
+
+  handleGlobalDataRestored() {
+    // 1. Reload schedule & Today's Rhythm
+    this.scheduleData = this.loadInitialSchedule();
+    this.initTodayView();
+    if (this.timetableView) {
+      this.timetableView.updateData(this.scheduleData);
+    }
+
+    // 2. Reload Tasks & IMs
+    if (this.taskStudio) {
+      this.taskStudio.tasks = this.taskStudio.loadTasks();
+      this.renderTasksList();
+      this.updateTodayTaskWidget();
+    }
+
+    // 3. Reload Classrooms & Student Rosters
+    if (this.classManager) {
+      this.classManager.classes = this.classManager.load(this.classManager.storageKeys.classes, []);
+      this.classManager.students = this.classManager.load(this.classManager.storageKeys.students, []);
+      this.classManager.enrollments = this.classManager.load(this.classManager.storageKeys.enrollments, []);
+      this.classManager.selectedClassId = this.classManager.classes.length > 0 ? this.classManager.classes[0].id : null;
+      this.renderClassroomView();
+    }
+
+    // 4. Reload Reviewer Studio
+    if (this.reviewerStudio) {
+      this.reviewerStudio.cards = this.reviewerStudio.loadCards();
+      this.reviewerStudio.render();
+    }
+
+    // 5. Reload Field Study Notebook
+    if (this.fieldStudyNotebook) {
+      this.fieldStudyNotebook.entries = this.fieldStudyNotebook.loadEntries();
+      this.fieldStudyNotebook.render();
+    }
+
+    // 6. Reload Lesson Plan Studio
+    if (this.lessonPlanStudio) {
+      this.lessonPlanStudio.restoreSavedPlan();
     }
   }
 
