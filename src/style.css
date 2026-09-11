@@ -133,12 +133,25 @@ body {
   border-bottom: 1px solid var(--border-light);
 }
 
+.brand-perspective-cluster {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-divider {
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 300;
+  user-select: none;
+  opacity: 0.4;
+}
+
 .brand-group {
   display: flex;
   align-items: center;
   gap: 10px;
   text-decoration: none;
-  min-width: 180px;
 }
 
 .brand-icon {
@@ -170,13 +183,7 @@ body {
   line-height: 1.2;
 }
 
-/* Dual-Perspective Macro Switcher */
-.perspective-switcher-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
+/* Dual-Perspective Macro Switcher (Side-by-Side with Brand) */
 .perspective-switcher {
   display: flex;
   align-items: center;
