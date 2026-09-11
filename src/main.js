@@ -8,6 +8,7 @@ import { LessonPlanStudio } from './lesson-plan-studio.js';
 import { TimetableView } from './timetable-view.js';
 import { ClassManager } from './class-manager.js';
 import { TaskStudio } from './task-studio.js';
+import { DocumentDesk } from './document-desk.js';
 
 class PedagogoDeskApp {
   constructor() {
@@ -36,6 +37,7 @@ class PedagogoDeskApp {
     this.lessonPlanStudio = new LessonPlanStudio();
     this.classManager = new ClassManager();
     this.taskStudio = new TaskStudio();
+    this.documentDesk = new DocumentDesk();
     this.syncManager = new SyncManager((newData) => {
       this.onScheduleUpdated(newData);
     });

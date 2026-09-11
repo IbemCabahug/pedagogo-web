@@ -9,6 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "jszip": "^3.10.2",
+    "mammoth": "^1.12.2",
+    "pdfjs-dist": "^6.3.289",
     "peerjs": "^1.5.4",
     "qrcode": "^1.5.4"
   },
