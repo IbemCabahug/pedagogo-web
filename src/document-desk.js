@@ -1,6 +1,7 @@
 /**
- * Pedagogo Desk: Document Reading Desk Component 📖🌿
- * Orchestrates client-side file reading, search, and research-backed 5-part pedagogical synthesis.
+ * Pedagogo Desk: Document Reading Desk & Cornell Note Studio 📖🌿
+ * Orchestrates client-side file reading, search, 5-part pedagogical synthesis,
+ * and classic Walter Pauk Cornell Study Sheets with "Fold & Test" active recall.
  */
 
 import { DocumentParser } from './document-parser.js';
@@ -11,9 +12,10 @@ export class DocumentDesk {
   constructor() {
     this.currentDoc = null;
     this.currentAnalysis = null;
-    this.activeSubTab = 'synthesis'; // 'synthesis' or 'verbatim'
+    this.activeSubTab = 'synthesis'; // 'synthesis', 'cornell', or 'verbatim'
     this.searchQuery = '';
     this.isProcessing = false;
+    this.isCornellFolded = false; // "Fold & Test" active recall state
 
     this.container = document.getElementById('view-reading-desk');
     if (this.container) {
@@ -38,7 +40,7 @@ export class DocumentDesk {
       <div class="view-header">
         <div>
           <h2 class="section-title">Smart Pedagogical Reading Desk 📖🌿</h2>
-          <p class="section-desc">Upload course readings, DepEd orders, or slide decks to extract word-for-word text and generate research-backed study syntheses.</p>
+          <p class="section-desc">Upload course readings, DepEd orders, or slide decks to extract verbatim text and generate research-backed Cornell study sheets.</p>
         </div>
         <div class="header-actions">
           <button class="btn-subtle" id="btn-open-gemini-modal">
@@ -116,22 +118,34 @@ export class DocumentDesk {
           </div>
         </div>
 
-        <!-- Sub-tab Perspective Switcher: Verbatim vs Synthesis -->
+        <!-- Sub-tab Perspective Switcher: Synthesis vs Cornell vs Verbatim -->
         <div class="reading-subtabs">
           <button class="reading-subtab ${this.activeSubTab === 'synthesis' ? 'active' : ''}" data-subtab="synthesis" id="btn-subtab-synthesis">
-            <span>💡 Pedagogical Synthesis (Research-Backed)</span>
+            <span>💡 Pedagogical Synthesis</span>
+          </button>
+          <button class="reading-subtab ${this.activeSubTab === 'cornell' ? 'active' : ''}" data-subtab="cornell" id="btn-subtab-cornell">
+            <span>📝 Cornell Study Sheet</span>
           </button>
           <button class="reading-subtab ${this.activeSubTab === 'verbatim' ? 'active' : ''}" data-subtab="verbatim" id="btn-subtab-verbatim">
-            <span>📖 Verbatim Transcript (Word-for-Word)</span>
+            <span>📖 Verbatim Transcript</span>
           </button>
         </div>
 
         <!-- Actions -->
         <div class="workspace-actions">
-          <button class="btn-subtle" id="btn-copy-reading-text" title="Copy active view text">
-            📋 <span>Copy</span>
-          </button>
-          <button class="btn-subtle" id="btn-print-reading-guide" title="Print this study guide">
+          ${this.activeSubTab === 'cornell' ? `
+            <button class="btn-subtle" id="btn-toggle-fold-notes" title="Cover or reveal notes column for active recall practice">
+              ${this.isCornellFolded ? '👁️ <span>Reveal Notes</span>' : '🙈 <span>Fold &amp; Test</span>'}
+            </button>
+            <button class="btn-subtle" id="btn-export-cornell-doc" title="Download formatted Cornell Sheet for Microsoft Word">
+              📄 <span>Export Word (.doc)</span>
+            </button>
+          ` : `
+            <button class="btn-subtle" id="btn-copy-reading-text" title="Copy active view text">
+              📋 <span>Copy</span>
+            </button>
+          `}
+          <button class="btn-subtle" id="btn-print-reading-guide" title="Print this study sheet for physical binder">
             🖨️ <span>Print</span>
           </button>
         </div>
@@ -154,7 +168,12 @@ export class DocumentDesk {
           </div>
         </div>
 
-        <!-- View B: Verbatim Word-for-Word Reader -->
+        <!-- View B: Interactive Walter Pauk Cornell Note View -->
+        <div class="cornell-panel" id="cornell-panel" style="${this.activeSubTab === 'cornell' ? 'display: block;' : 'display: none;'}">
+          ${this.renderCornellSheet(analysis?.markdown || '', doc)}
+        </div>
+
+        <!-- View C: Verbatim Word-for-Word Reader -->
         <div class="verbatim-panel" id="verbatim-panel" style="${this.activeSubTab === 'verbatim' ? 'display: block;' : 'display: none;'}">
           <!-- Search & Unit Filter Toolbar -->
           <div class="verbatim-toolbar">
@@ -180,10 +199,287 @@ export class DocumentDesk {
     this.bindWorkspaceEvents();
   }
 
+  /**
+   * Walter Pauk Spatial Cornell Architecture:
+   * Header -> Left Cue Column (30%) + Right Notes Column (70%) -> Bottom Summary Row
+   */
+  renderCornellSheet(md, doc) {
+    if (!md) return '<p class="empty-text">No document analysis available.</p>';
+
+    // Extract Cues, Synthesis, Notes, Analogies, and Chunks
+    let summaryText = 'Distill core ideas from reading into an enduring takeaway.';
+    const sumMatch = md.match(/Macro-Synthesis[^\n:]*:\*\*\s*([^\n]+)/i);
+    if (sumMatch) summaryText = sumMatch[1];
+
+    // Extract Active Recall Cues
+    const cues = [];
+    const cueMatches = md.matchAll(/(?:Active Recall Cue Questions|Recall Cues)[^\n]*\n([\s\S]*?)(?=### 2\.|$)/gi);
+    for (const match of cueMatches) {
+      const lines = match[1].split('\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('•') || /^\d+\./.test(l.trim()));
+      lines.forEach(l => {
+        const clean = l.replace(/^[-•\d.]\s*/, '').trim();
+        if (clean) cues.push(clean);
+      });
+    }
+
+    if (cues.length === 0) {
+      cues.push('What is the central pedagogical premise?');
+      cues.push('How does this translate into concrete classroom practice?');
+      cues.push('What are the key contrasting concepts?');
+    }
+
+    // Extract Structured Notes (Chunks & Analogies)
+    let notesMarkdown = '';
+    const chunksMatch = md.match(/### 2\. 🧩 Structured Concept Chunks[\s\S]*?(?=### 4\.|$)/);
+    if (chunksMatch) {
+      notesMarkdown = chunksMatch[0];
+    } else {
+      notesMarkdown = md;
+    }
+
+    const dateFormatted = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    return `
+      <div class="cornell-sheet-container" id="cornell-sheet-container">
+        <!-- Top Binder Header Strip -->
+        <div class="cornell-sheet-header">
+          <div class="cornell-header-cell">
+            <span class="cornell-label">COURSE / SUBJECT:</span>
+            <span class="cornell-val">Pre-Service Professional Education</span>
+          </div>
+          <div class="cornell-header-cell">
+            <span class="cornell-label">TOPIC / MODULE:</span>
+            <span class="cornell-val">${this.escapeHtml(doc.filename.replace(/\.[^/.]+$/, ''))}</span>
+          </div>
+          <div class="cornell-header-cell">
+            <span class="cornell-label">DATE:</span>
+            <span class="cornell-val">${dateFormatted}</span>
+          </div>
+          <div class="cornell-header-cell">
+            <span class="cornell-label">SOURCE:</span>
+            <span class="cornell-val">${doc.fileType} (${doc.totalUnits} ${doc.unitLabel})</span>
+          </div>
+        </div>
+
+        <!-- Instructions Banner -->
+        <div class="cornell-instructions-strip">
+          <span class="cornell-inst-badge">Walter Pauk Method</span>
+          <span class="cornell-inst-desc">
+            <strong>Active Recall Practice:</strong> Cover the right column and recite the concepts aloud using only the cues on the left.
+          </span>
+          <button class="btn-subtle btn-toggle-fold-inline" id="btn-toggle-fold-inline">
+            ${this.isCornellFolded ? '👁️ Unfold Notes' : '🙈 Fold Notes to Test Yourself'}
+          </button>
+        </div>
+
+        <!-- 2-Column Spatial Core -->
+        <div class="cornell-two-column-body">
+          <!-- Left Column: Cues, Recall Prompts, Keywords (~30%) -->
+          <div class="cornell-cues-column">
+            <div class="cues-column-header">
+              <h4>RECALL CUES &amp; PROMPTS</h4>
+              <span class="cues-sub">(Questions, Keywords, Formulas)</span>
+            </div>
+
+            <div class="cues-list">
+              ${cues.map((cue, idx) => `
+                <div class="cue-item-card">
+                  <span class="cue-bullet">Q${idx + 1}</span>
+                  <p class="cue-text">${this.simpleMarkdown(cue)}</p>
+                </div>
+              `).join('')}
+
+              <div class="cue-item-card prompt-card">
+                <span class="cue-bullet">🎯</span>
+                <p class="cue-text"><strong>Classroom Translation:</strong> How will I execute this in a real high school classroom?</p>
+              </div>
+
+              <div class="cue-item-card prompt-card">
+                <span class="cue-bullet">⚖️</span>
+                <p class="cue-text"><strong>Contrastive Focus:</strong> What distinguishing attributes separate these core theories?</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Main Notes, Concept Outlines & Analogies (~70%) -->
+          <div class="cornell-notes-column ${this.isCornellFolded ? 'cornell-folded' : ''}" id="cornell-notes-column">
+            ${this.isCornellFolded ? `
+              <div class="cornell-fold-overlay" id="cornell-fold-overlay">
+                <div class="fold-overlay-box">
+                  <span class="fold-icon">🙈</span>
+                  <h4>Notes are Folded for Active Recall</h4>
+                  <p>Read each cue question on the left and recite the explanation aloud from memory.</p>
+                  <button class="btn-primary" id="btn-reveal-folded-notes">
+                    👁️ Click to Check Your Memory
+                  </button>
+                </div>
+              </div>
+            ` : ''}
+
+            <div class="notes-column-header">
+              <h4>DETAILED CLASS NOTES &amp; CONCEPTUAL CHUNKS</h4>
+              <span class="notes-sub">(Outlines, Definitions, Concrete Analogies, and Frameworks)</span>
+            </div>
+
+            <div class="notes-content-stream">
+              ${this.renderSynthesisMarkdown(notesMarkdown)}
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Row: Overarching Macro-Synthesis Summary -->
+        <div class="cornell-summary-block">
+          <div class="summary-header">
+            <h4>SUMMARY &amp; ENDURING UNDERSTANDING</h4>
+            <span class="summary-sub">(Brief 2-3 sentence cognitive synthesis answering: "What is the core takeaway?")</span>
+          </div>
+          <div class="summary-text-box">
+            <p>${this.simpleMarkdown(summaryText)}</p>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Generates formatted Microsoft Word (.doc) Cornell Note Sheet
+   */
+  exportCornellToWord() {
+    const doc = this.currentDoc;
+    const analysis = this.currentAnalysis;
+    if (!doc || !analysis) {
+      showToast('Please open or analyze a document first.', 'warning');
+      return;
+    }
+
+    const md = analysis.markdown || '';
+    const dateFormatted = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    // Extract Summary
+    let summaryText = 'Distill core ideas into an enduring understanding.';
+    const sumMatch = md.match(/Macro-Synthesis[^\n:]*:\*\*\s*([^\n]+)/i);
+    if (sumMatch) summaryText = sumMatch[1];
+
+    // Extract Cues
+    const cues = [];
+    const cueMatches = md.matchAll(/(?:Active Recall Cue Questions|Recall Cues)[^\n]*\n([\s\S]*?)(?=### 2\.|$)/gi);
+    for (const match of cueMatches) {
+      const lines = match[1].split('\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('•') || /^\d+\./.test(l.trim()));
+      lines.forEach(l => {
+        const clean = l.replace(/^[-•\d.]\s*/, '').trim();
+        if (clean) cues.push(clean);
+      });
+    }
+    if (cues.length === 0) {
+      cues.push('What are the foundational principles of this text?');
+      cues.push('How does this apply to classroom instruction and assessment?');
+      cues.push('What are common misconceptions students have?');
+    }
+
+    // Extract Notes
+    let notesSnippet = '';
+    const chunksMatch = md.match(/### 2\. 🧩 Structured Concept Chunks[\s\S]*?(?=### 4\.|$)/);
+    if (chunksMatch) {
+      notesSnippet = chunksMatch[0];
+    } else {
+      notesSnippet = md;
+    }
+
+    const wordHtml = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" 
+            xmlns:w="urn:schemas-microsoft-com:office:word" 
+            xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <title>Cornell Note Study Sheet - ${this.escapeHtml(doc.filename)}</title>
+        <style>
+          body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; line-height: 1.35; color: #1a1a1a; margin: 20px; }
+          .header-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 1.5pt solid #3B6347; }
+          .header-table td { padding: 6px 10px; font-size: 10pt; border: 0.5pt solid #ccc; }
+          .header-table th { background-color: #F4F7F4; color: #3B6347; font-weight: bold; text-align: left; padding: 6px 10px; border: 0.5pt solid #ccc; font-size: 10pt; }
+          
+          .cornell-main-table { width: 100%; border-collapse: collapse; border: 2pt solid #3B6347; }
+          .col-cues { width: 30%; vertical-align: top; background-color: #FAFBF9; border-right: 2pt solid #3B6347; padding: 14px; }
+          .col-notes { width: 70%; vertical-align: top; background-color: #FFFFFF; padding: 14px; }
+          
+          .section-title { font-size: 11pt; font-weight: bold; text-transform: uppercase; color: #3B6347; border-bottom: 1pt solid #3B6347; padding-bottom: 4px; margin-bottom: 10px; }
+          .cue-box { margin-bottom: 14px; background-color: #F0F4F1; border-left: 3pt solid #3B6347; padding: 6px 8px; font-size: 9.5pt; }
+          
+          .row-summary { background-color: #FAF8F3; border-top: 2pt solid #3B6347; padding: 12px 14px; }
+          .summary-title { font-size: 11pt; font-weight: bold; color: #BF5F3E; text-transform: uppercase; margin-bottom: 5px; }
+          .summary-body { font-size: 10pt; color: #222; font-style: italic; }
+        </style>
+      </head>
+      <body>
+        <table class="header-table">
+          <tr>
+            <th width="20%">SUBJECT / COURSE:</th>
+            <td width="30%">Pre-Service Professional Education</td>
+            <th width="20%">DATE:</th>
+            <td width="30%">${dateFormatted}</td>
+          </tr>
+          <tr>
+            <th>TOPIC / MODULE:</th>
+            <td><strong>${this.escapeHtml(doc.filename.replace(/\.[^/.]+$/, ''))}</strong></td>
+            <th>DOCUMENT SOURCE:</th>
+            <td>${doc.fileType} (${doc.totalUnits} ${doc.unitLabel})</td>
+          </tr>
+        </table>
+
+        <table class="cornell-main-table">
+          <tr>
+            <td class="col-cues">
+              <div class="section-title">RECALL CUES &amp; PROMPTS</div>
+              <p style="font-size: 8.5pt; color: #666; margin-bottom: 12px;">(Self-quizzing triggers &amp; key terms)</p>
+              ${cues.map((c, i) => `
+                <div class="cue-box">
+                  <strong>Q${i + 1}:</strong> ${this.escapeHtml(c)}
+                </div>
+              `).join('')}
+            </td>
+            <td class="col-notes">
+              <div class="section-title">DETAILED CLASSROOM NOTES &amp; CONCEPTS</div>
+              <p style="font-size: 8.5pt; color: #666; margin-bottom: 12px;">(Outlines, analogies, and core definitions)</p>
+              <div style="font-size: 10pt; line-height: 1.45;">
+                ${this.simpleMarkdown(notesSnippet)}
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" class="row-summary">
+              <div class="summary-title">SUMMARY &amp; ENDURING UNDERSTANDING</div>
+              <div class="summary-body">${this.escapeHtml(summaryText)}</div>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const cleanFilename = doc.filename.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30);
+    const blob = new Blob([wordHtml], { type: 'application/msword;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${cleanFilename}_Cornell_Notes.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast('📄 Cornell Study Sheet downloaded as Word (.doc) file!', 'success');
+  }
+
   renderSynthesisMarkdown(md) {
     if (!md) return '<p class="empty-text">No analysis available.</p>';
 
-    // Parse sections and render rich pedagogical cards
     let html = md;
 
     // Convert Markdown tables to styled HTML tables
@@ -206,7 +502,7 @@ export class DocumentDesk {
       `;
     });
 
-    // Parse headings
+    // Headings to rich cards
     html = html.replace(/### (1\. 🎓 Cornell Synthesis[\s\S]*?)(?=### 2\.|$)/, (m, c) => {
       return `<div class="pedagogical-card card-cornell"><h3 class="card-header-cornell">1. 🎓 Cornell Synthesis &amp; Active Cues</h3><div class="card-body-content">${this.simpleMarkdown(c.replace('1. 🎓 Cornell Synthesis & Active Cues', ''))}</div></div>`;
     });
@@ -241,6 +537,7 @@ export class DocumentDesk {
   }
 
   simpleMarkdown(text) {
+    if (!text) return '';
     return text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -250,19 +547,15 @@ export class DocumentDesk {
   }
 
   renderInteractiveQuiz(rawQuizText) {
-    // Split into individual questions
     const questionBlocks = rawQuizText.split(/\*\*Question \d+:\*\*/g).filter(b => b.trim().length > 0);
     
     return questionBlocks.map((block, idx) => {
       const qNum = idx + 1;
-      
-      // Extract answer & rationalization
       let answerMatch = block.match(/\*\*Correct Answer:\*\*\s*([A-D])/i);
       let answer = answerMatch ? answerMatch[1].toUpperCase() : 'A';
       let rationaleMatch = block.match(/\*\*Pedagogical Rationalization:\*\*\s*([\s\S]*?)(?=(?:Question|$))/i);
       let rationale = rationaleMatch ? rationaleMatch[1].trim() : 'Active recall tests deep conceptual alignment.';
 
-      // Strip answer lines from displayed prompt
       let promptAndOptions = block
         .replace(/\*\*Correct Answer:\*\*[\s\S]*$/, '')
         .trim();
@@ -371,11 +664,16 @@ export class DocumentDesk {
   bindWorkspaceEvents() {
     const btnBack = document.getElementById('btn-back-upload');
     const subtabSynthesis = document.getElementById('btn-subtab-synthesis');
+    const subtabCornell = document.getElementById('btn-subtab-cornell');
     const subtabVerbatim = document.getElementById('btn-subtab-verbatim');
     const searchInput = document.getElementById('verbatim-search-input');
     const btnClearSearch = document.getElementById('btn-clear-search');
     const btnCopy = document.getElementById('btn-copy-reading-text');
     const btnPrint = document.getElementById('btn-print-reading-guide');
+    const btnToggleFold = document.getElementById('btn-toggle-fold-notes');
+    const btnToggleFoldInline = document.getElementById('btn-toggle-fold-inline');
+    const btnRevealFolded = document.getElementById('btn-reveal-folded-notes');
+    const btnExportCornell = document.getElementById('btn-export-cornell-doc');
 
     if (btnBack) {
       btnBack.addEventListener('click', () => {
@@ -386,14 +684,44 @@ export class DocumentDesk {
       });
     }
 
-    if (subtabSynthesis && subtabVerbatim) {
+    if (subtabSynthesis) {
       subtabSynthesis.addEventListener('click', () => {
         this.activeSubTab = 'synthesis';
         this.render();
       });
+    }
+
+    if (subtabCornell) {
+      subtabCornell.addEventListener('click', () => {
+        this.activeSubTab = 'cornell';
+        this.render();
+      });
+    }
+
+    if (subtabVerbatim) {
       subtabVerbatim.addEventListener('click', () => {
         this.activeSubTab = 'verbatim';
         this.render();
+      });
+    }
+
+    // Fold / Unfold active recall toggle
+    const handleToggleFold = () => {
+      this.isCornellFolded = !this.isCornellFolded;
+      this.render();
+      if (this.isCornellFolded) {
+        showToast('🙈 Notes folded! Use the cues on the left to test your active recall.', 'info');
+      }
+    };
+
+    if (btnToggleFold) btnToggleFold.addEventListener('click', handleToggleFold);
+    if (btnToggleFoldInline) btnToggleFoldInline.addEventListener('click', handleToggleFold);
+    if (btnRevealFolded) btnRevealFolded.addEventListener('click', handleToggleFold);
+
+    // Export Word .doc
+    if (btnExportCornell) {
+      btnExportCornell.addEventListener('click', () => {
+        this.exportCornellToWord();
       });
     }
 
@@ -448,7 +776,6 @@ export class DocumentDesk {
           const rationaleMatch = block.match(/\*\*Pedagogical Rationalization:\*\*\s*([\s\S]*?)(?=(?:Question|$))/i);
           const prompt = block.replace(/\*\*Correct Answer:\*\*[\s\S]*$/, '').trim();
           
-          // Extract options
           const options = [];
           const optLines = block.match(/- [A-D]\) .+/g);
           if (optLines) {
@@ -480,7 +807,7 @@ export class DocumentDesk {
 
     // Unit jump pills
     document.querySelectorAll('.unit-jump-pill').forEach(pill => {
-      pill.addEventListener('click', (e) => {
+      pill.addEventListener('click', () => {
         document.querySelectorAll('.unit-jump-pill').forEach(p => p.classList.remove('active'));
         pill.classList.add('active');
         const unitNum = pill.dataset.unit;
