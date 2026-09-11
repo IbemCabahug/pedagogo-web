@@ -7,6 +7,7 @@ import { SyncManager } from './sync-manager.js';
 import { LessonPlanStudio } from './lesson-plan-studio.js';
 import { TimetableView } from './timetable-view.js';
 import { ClassManager } from './class-manager.js';
+import { TaskStudio } from './task-studio.js';
 
 class PedagogoDeskApp {
   constructor() {
@@ -33,11 +34,13 @@ class PedagogoDeskApp {
     this.timetableView = new TimetableView(this.scheduleData);
     this.lessonPlanStudio = new LessonPlanStudio();
     this.classManager = new ClassManager();
+    this.taskStudio = new TaskStudio();
     this.syncManager = new SyncManager((newData) => {
       this.onScheduleUpdated(newData);
     });
 
     this.initClassroomUI();
+    this.initTaskStudioUI();
 
     const btnQuickSync = document.getElementById('btn-quick-sync-today');
     if (btnQuickSync) {
@@ -750,6 +753,405 @@ FEMALE
 
     // Trigger Browser Print Dialog
     window.print();
+  }
+
+  // =========================================================
+  // Academic Tasks & IMs Studio Orchestration
+  // =========================================================
+
+  initTaskStudioUI() {
+    // 1. Filter buttons
+    const filterBtns = document.querySelectorAll('.task-filter-btn');
+    filterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.taskStudio.activeFilter = btn.dataset.filter;
+        this.renderTasksList();
+      });
+    });
+
+    // 2. Modals setup (Task modal & Breathing modal)
+    const setupModal = (modalId, closeBtnId, cancelBtnId) => {
+      const modal = document.getElementById(modalId);
+      const closeBtn = document.getElementById(closeBtnId);
+      const cancelBtn = document.getElementById(cancelBtnId);
+      const close = () => { if (modal) modal.style.display = 'none'; };
+      if (closeBtn) closeBtn.addEventListener('click', close);
+      if (cancelBtn) cancelBtn.addEventListener('click', close);
+      if (modal) {
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) close();
+        });
+      }
+    };
+
+    setupModal('modal-task', 'btn-close-task-modal', 'btn-cancel-task-modal');
+    setupModal('modal-breathing', 'btn-close-breathing', 'btn-finish-breathing');
+
+    // Open Task Modal
+    const btnCreateTask = document.getElementById('btn-create-task-modal');
+    const btnEmptyCreate = document.getElementById('btn-empty-create-task');
+    [btnCreateTask, btnEmptyCreate].forEach(btn => {
+      if (btn) btn.addEventListener('click', () => this.openTaskModal());
+    });
+
+    // Save Task Form
+    const formTask = document.getElementById('form-task');
+    if (formTask) {
+      formTask.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const taskId = document.getElementById('input-task-id').value;
+        const data = {
+          title: document.getElementById('input-task-title').value,
+          subjectCode: document.getElementById('input-task-subject').value,
+          category: document.getElementById('input-task-category').value,
+          dueDate: document.getElementById('input-task-due').value,
+          estimatedMinutes: document.getElementById('input-task-minutes').value,
+          materials: document.getElementById('input-task-materials').value,
+          notes: document.getElementById('input-task-notes').value
+        };
+
+        if (taskId) {
+          this.taskStudio.updateTask(taskId, data);
+        } else {
+          this.taskStudio.addTask(data);
+        }
+
+        document.getElementById('modal-task').style.display = 'none';
+        this.renderTasksList();
+      });
+    }
+
+    // 3. Timer Mode Buttons (Focus vs Rest)
+    const btnModeFocus = document.getElementById('btn-mode-focus');
+    const btnModeBreak = document.getElementById('btn-mode-break');
+    if (btnModeFocus && btnModeBreak) {
+      btnModeFocus.addEventListener('click', () => {
+        btnModeFocus.classList.add('active');
+        btnModeBreak.classList.remove('active');
+        this.taskStudio.setTimerMode('FOCUS');
+        this.updateTimerDisplay();
+      });
+      btnModeBreak.addEventListener('click', () => {
+        btnModeBreak.classList.add('active');
+        btnModeFocus.classList.remove('active');
+        this.taskStudio.setTimerMode('BREAK');
+        this.updateTimerDisplay();
+      });
+    }
+
+    // 4. Timer Controls (Start/Pause, Reset)
+    const btnTimerToggle = document.getElementById('btn-timer-toggle');
+    const btnTimerReset = document.getElementById('btn-timer-reset');
+
+    if (btnTimerToggle) {
+      btnTimerToggle.addEventListener('click', () => {
+        if (this.taskStudio.isTimerRunning) {
+          this.taskStudio.pauseTimer();
+          this.updateTimerControlsState(false);
+        } else {
+          this.taskStudio.startTimer(
+            () => {
+              this.updateTimerDisplay();
+            },
+            (completedMode) => {
+              this.updateTimerControlsState(false);
+              const isFocus = completedMode === 'FOCUS';
+              alert(isFocus ? '🎉 Splendid work! Your 25-minute study block is complete. Stretch and take a restorative breath.' : '☕ Rest break complete! Ready to nurture your next task?');
+              if (isFocus && btnModeBreak) {
+                btnModeBreak.click();
+              } else if (btnModeFocus) {
+                btnModeFocus.click();
+              }
+            }
+          );
+          this.updateTimerControlsState(true);
+        }
+      });
+    }
+
+    if (btnTimerReset) {
+      btnTimerReset.addEventListener('click', () => {
+        this.taskStudio.resetTimer();
+        this.updateTimerControlsState(false);
+        this.updateTimerDisplay();
+      });
+    }
+
+    // 5. Ambient Sound Controls
+    const ambientBtns = document.querySelectorAll('.btn-ambient');
+    const ambientBadge = document.getElementById('ambient-active-badge');
+    ambientBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.ambient;
+        const active = this.taskStudio.toggleAmbient(mode);
+
+        ambientBtns.forEach(b => b.classList.toggle('active', b.dataset.ambient === active));
+        if (ambientBadge) {
+          ambientBadge.textContent = active === 'OFF' ? 'Off' : active;
+        }
+      });
+    });
+
+    // 6. 1-Minute Centering Breath Guide
+    const btnBreathing = document.getElementById('btn-start-breathing');
+    if (btnBreathing) {
+      btnBreathing.addEventListener('click', () => {
+        this.startBreathingGuide();
+      });
+    }
+
+    // Initial render
+    this.renderTasksList();
+    this.updateTimerDisplay();
+  }
+
+  updateTimerControlsState(running) {
+    const icon = document.getElementById('timer-toggle-icon');
+    const label = document.getElementById('timer-toggle-label');
+    const status = document.getElementById('timer-status-text');
+
+    if (icon) icon.textContent = running ? '⏸️' : '▶️';
+    if (label) label.textContent = running ? 'Pause' : (this.taskStudio.timerRemaining < this.taskStudio.timerDuration ? 'Resume' : 'Start Session');
+    if (status) status.textContent = running ? (this.taskStudio.timerMode === 'FOCUS' ? 'Deep Study Flow' : 'Restorative Pause') : 'Paused';
+  }
+
+  updateTimerDisplay() {
+    const display = document.getElementById('timer-display');
+    const circle = document.getElementById('timer-progress-circle');
+    if (display) {
+      display.textContent = this.taskStudio.formatTime(this.taskStudio.timerRemaining);
+    }
+
+    if (circle) {
+      const circumference = 2 * Math.PI * 70; // 439.82
+      const percent = this.taskStudio.timerRemaining / this.taskStudio.timerDuration;
+      const offset = circumference * (1 - percent);
+      circle.style.strokeDashoffset = offset;
+    }
+  }
+
+  startBreathingGuide() {
+    const modal = document.getElementById('modal-breathing');
+    const instruction = document.getElementById('breathing-instruction-text');
+    const sub = document.getElementById('breathing-sub-text');
+    const secondsEl = document.getElementById('breathing-seconds-left');
+    if (!modal) return;
+
+    modal.style.display = 'flex';
+    let timeLeft = 60;
+    if (secondsEl) secondsEl.textContent = timeLeft;
+
+    const phases = [
+      { text: "Breathe in gently...", sub: "Inhale calm through your nose (4s)" },
+      { text: "Hold peacefully...", sub: "Rest in the gentle stillness (4s)" },
+      { text: "Release slowly...", sub: "Exhale through your mouth and relax your shoulders (4s)" },
+      { text: "Rest and soften...", sub: "Feel your heart rhythm settle (4s)" }
+    ];
+
+    if (this.taskStudio.breathingInterval) {
+      clearInterval(this.taskStudio.breathingInterval);
+    }
+
+    let phaseIndex = 0;
+    const updatePhase = () => {
+      const p = phases[phaseIndex % phases.length];
+      if (instruction) instruction.textContent = p.text;
+      if (sub) sub.textContent = p.sub;
+    };
+    updatePhase();
+
+    this.taskStudio.breathingInterval = setInterval(() => {
+      timeLeft--;
+      if (secondsEl) secondsEl.textContent = timeLeft;
+
+      if ((60 - timeLeft) % 4 === 0) {
+        phaseIndex++;
+        updatePhase();
+      }
+
+      if (timeLeft <= 0) {
+        clearInterval(this.taskStudio.breathingInterval);
+        this.taskStudio.breathingInterval = null;
+        if (instruction) instruction.textContent = "Centered & Ready 🌿";
+        if (sub) sub.textContent = "Your mind is clear and grounded. Nurture your work with joy.";
+      }
+    }, 1000);
+  }
+
+  renderTasksList() {
+    const container = document.getElementById('tasks-list-container');
+    const emptyState = document.getElementById('empty-tasks-state');
+    const balanceText = document.getElementById('task-balance-text');
+    const targetTitle = document.getElementById('focus-current-task-title');
+    if (!container) return;
+
+    const allTasks = this.taskStudio.getAllTasks();
+    const filtered = this.taskStudio.getFilteredTasks();
+
+    // Update Balance Text
+    const completedCount = allTasks.filter(t => t.completed).length;
+    if (balanceText) {
+      balanceText.textContent = `${completedCount} of ${allTasks.length} studio tasks nurtured • Pace yourself with kindness.`;
+    }
+
+    // Update active target focus
+    const focusTask = allTasks.find(t => t.id === this.taskStudio.selectedTaskIdForFocus) || allTasks.find(t => !t.completed);
+    if (targetTitle) {
+      targetTitle.textContent = focusTask ? `${focusTask.subjectCode} — ${focusTask.title}` : 'Desk clear! Choose a task to nurture.';
+    }
+
+    if (filtered.length === 0) {
+      container.innerHTML = '';
+      if (emptyState) emptyState.style.display = 'block';
+      return;
+    }
+
+    if (emptyState) emptyState.style.display = 'none';
+    container.innerHTML = '';
+
+    filtered.forEach(task => {
+      const card = document.createElement('div');
+      card.className = `task-card ${task.completed ? 'completed' : ''}`;
+
+      const catBadgeClass = this.getCategoryBadgeClass(task.category);
+      const catLabel = this.getCategoryLabel(task.category);
+
+      let materialsHtml = '';
+      if (task.materials && task.materials.length > 0) {
+        materialsHtml = `
+          <div class="task-materials-row">
+            ${task.materials.map(m => `<span class="material-chip">✂️ ${m}</span>`).join('')}
+          </div>
+        `;
+      }
+
+      card.innerHTML = `
+        <div class="task-checkbox-wrapper">
+          <button class="btn-task-check ${task.completed ? 'checked' : ''}" title="${task.completed ? 'Mark incomplete' : 'Mark complete'}">
+            ${task.completed ? '✓' : ''}
+          </button>
+        </div>
+        <div class="task-content">
+          <div class="task-meta-row">
+            <span class="badge-subj">${task.subjectCode}</span>
+            <span class="${catBadgeClass}">${catLabel}</span>
+          </div>
+          <h4 class="task-title">${task.title}</h4>
+          ${materialsHtml}
+          ${task.notes ? `<p class="task-notes-text">${task.notes}</p>` : ''}
+          <div class="task-footer-row">
+            <div class="task-meta-chips">
+              <span>🗓️ Due ${this.formatDueDate(task.dueDate)}</span>
+              <span>⏱️ ${task.estimatedMinutes} mins</span>
+            </div>
+            <div class="task-actions-group">
+              <button class="btn-focus-task" title="Focus on this task in the study companion">🎯 Focus</button>
+              <button class="btn-task-action btn-edit-task" title="Edit task">✏️</button>
+              <button class="btn-task-action btn-delete-task text-danger" title="Delete task">🗑️</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Event Handlers
+      const checkBtn = card.querySelector('.btn-task-check');
+      if (checkBtn) {
+        checkBtn.addEventListener('click', () => {
+          this.taskStudio.toggleTaskCompletion(task.id);
+          this.renderTasksList();
+        });
+      }
+
+      const focusBtn = card.querySelector('.btn-focus-task');
+      if (focusBtn) {
+        focusBtn.addEventListener('click', () => {
+          this.taskStudio.selectedTaskIdForFocus = task.id;
+          if (targetTitle) {
+            targetTitle.textContent = `${task.subjectCode} — ${task.title}`;
+          }
+          const focusCard = document.querySelector('.focus-card');
+          if (focusCard) {
+            focusCard.style.outline = '2px solid var(--sage-primary)';
+            setTimeout(() => { focusCard.style.outline = ''; }, 1000);
+          }
+        });
+      }
+
+      const editBtn = card.querySelector('.btn-edit-task');
+      if (editBtn) {
+        editBtn.addEventListener('click', () => {
+          this.openTaskModal(task);
+        });
+      }
+
+      const deleteBtn = card.querySelector('.btn-delete-task');
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', () => {
+          if (confirm(`Remove "${task.title}"?`)) {
+            this.taskStudio.deleteTask(task.id);
+            this.renderTasksList();
+          }
+        });
+      }
+
+      container.appendChild(card);
+    });
+  }
+
+  getCategoryBadgeClass(cat) {
+    switch (cat) {
+      case 'IMS_PREP': return 'badge-cat-ims';
+      case 'REFLECTION': return 'badge-cat-reflection';
+      case 'DEMO_REHEARSAL': return 'badge-cat-demo';
+      case 'EXAM_READING': return 'badge-cat-exam';
+      default: return 'badge-cat-ims';
+    }
+  }
+
+  getCategoryLabel(cat) {
+    switch (cat) {
+      case 'IMS_PREP': return '✂️ IMs & Visual Aids';
+      case 'REFLECTION': return '📝 Field Reflection';
+      case 'DEMO_REHEARSAL': return '🎭 Demo Rehearsal';
+      case 'EXAM_READING': return '📚 Exam & Readings';
+      default: return 'Task';
+    }
+  }
+
+  formatDueDate(dateStr) {
+    if (!dateStr) return 'Flexible';
+    const due = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((due - today) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays === -1) return 'Yesterday';
+    return due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  openTaskModal(taskToEdit = null) {
+    const modal = document.getElementById('modal-task');
+    const titleEl = document.getElementById('modal-task-title');
+    if (!modal) return;
+
+    document.getElementById('input-task-id').value = taskToEdit ? taskToEdit.id : '';
+    document.getElementById('input-task-title').value = taskToEdit ? taskToEdit.title : '';
+    document.getElementById('input-task-subject').value = taskToEdit ? taskToEdit.subjectCode : 'ED 204';
+    document.getElementById('input-task-category').value = taskToEdit ? taskToEdit.category : 'IMS_PREP';
+    document.getElementById('input-task-due').value = taskToEdit ? (taskToEdit.dueDate || '') : this.taskStudio.getRelativeDate(1);
+    document.getElementById('input-task-minutes').value = taskToEdit ? (taskToEdit.estimatedMinutes || 45) : 45;
+    document.getElementById('input-task-materials').value = taskToEdit ? (taskToEdit.materials || []).join(', ') : '';
+    document.getElementById('input-task-notes').value = taskToEdit ? (taskToEdit.notes || '') : '';
+
+    if (titleEl) {
+      titleEl.textContent = taskToEdit ? 'Edit Academic Task' : 'Add Academic Task';
+    }
+
+    modal.style.display = 'flex';
   }
 }
 

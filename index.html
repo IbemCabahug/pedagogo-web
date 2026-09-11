@@ -31,6 +31,10 @@
             <span class="tab-icon">☀️</span>
             <span>Today's Rhythm</span>
           </button>
+          <button class="nav-tab" data-tab="tasks" id="tab-tasks">
+            <span class="tab-icon">🎯</span>
+            <span>Tasks &amp; IMs</span>
+          </button>
           <button class="nav-tab" data-tab="timetable" id="tab-timetable">
             <span class="tab-icon">🗓️</span>
             <span>Weekly Grid</span>
@@ -108,6 +112,127 @@
               <!-- Rendered via JS -->
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- VIEW: Academic Tasks & IMs Prep Studio -->
+      <section class="tab-view" id="view-tasks">
+        <div class="view-header">
+          <div>
+            <h2 class="section-title">Academic Tasks &amp; IMs Prep Studio 🌿</h2>
+            <p class="section-desc">Organize teaching aids, field reflections, and coursework with mindful calm</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn-primary" id="btn-create-task-modal">
+              <span>➕ Add Academic Task</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Studio Balance & Category Filter Bar -->
+        <div class="tasks-control-bar">
+          <div class="task-balance-banner" id="task-balance-banner">
+            <span class="balance-icon">🌱</span>
+            <span class="balance-text" id="task-balance-text">Loading student study balance...</span>
+          </div>
+
+          <div class="task-category-filters">
+            <button class="task-filter-btn active" data-filter="ALL">All Coursework</button>
+            <button class="task-filter-btn" data-filter="IMS_PREP">✂️ IMs &amp; Visual Aids</button>
+            <button class="task-filter-btn" data-filter="REFLECTION">📝 Field Reflections</button>
+            <button class="task-filter-btn" data-filter="DEMO_REHEARSAL">🎭 Demo Rehearsal</button>
+            <button class="task-filter-btn" data-filter="EXAM_READING">📚 Exams &amp; Theory</button>
+          </div>
+        </div>
+
+        <!-- Main Studio Two-Column Grid -->
+        <div class="tasks-studio-grid">
+          <!-- Left Column: Task Stream -->
+          <div class="task-stream-column">
+            <div class="tasks-list" id="tasks-list-container">
+              <!-- Rendered dynamically via TaskStudio -->
+            </div>
+
+            <!-- Empty Tasks State -->
+            <div class="sub-card empty-tasks-state" id="empty-tasks-state" style="display: none;">
+              <div class="empty-icon">🪴</div>
+              <h4>All Academic Tasks Nurtured!</h4>
+              <p>Your desk is clear. Relax your shoulders, take a restorative pause, and celebrate your hard work today.</p>
+              <button class="btn-primary" id="btn-empty-create-task">➕ Add Another Task</button>
+            </div>
+          </div>
+
+          <!-- Right Column: Mindful Focus Companion -->
+          <aside class="focus-companion-column">
+            <div class="sub-card focus-card">
+              <div class="focus-card-header">
+                <h3>🧘 Mindful Study Companion</h3>
+                <div class="focus-mode-pills">
+                  <button class="focus-mode-btn active" id="btn-mode-focus" data-mode="FOCUS">25m Focus</button>
+                  <button class="focus-mode-btn" id="btn-mode-break" data-mode="BREAK">5m Pause</button>
+                </div>
+              </div>
+
+              <!-- Active Task Indicator -->
+              <div class="focus-target-box">
+                <span class="focus-target-label">Current Study Focus:</span>
+                <p class="focus-target-title" id="focus-current-task-title">Select a task to nurture...</p>
+              </div>
+
+              <!-- Serene SVG Circular Countdown -->
+              <div class="timer-visual-container">
+                <svg class="timer-svg" viewBox="0 0 160 160">
+                  <circle class="timer-bg-circle" cx="80" cy="80" r="70"></circle>
+                  <circle class="timer-progress-circle" id="timer-progress-circle" cx="80" cy="80" r="70"></circle>
+                </svg>
+                <div class="timer-display-inner">
+                  <span class="timer-time" id="timer-display">25:00</span>
+                  <span class="timer-status-text" id="timer-status-text">Ready to Begin</span>
+                </div>
+              </div>
+
+              <!-- Timer Controls -->
+              <div class="timer-actions">
+                <button class="btn-primary timer-btn" id="btn-timer-toggle">
+                  <span id="timer-toggle-icon">▶️</span> <span id="timer-toggle-label">Start Session</span>
+                </button>
+                <button class="btn-subtle timer-btn" id="btn-timer-reset" title="Reset Session">
+                  🔄 Reset
+                </button>
+              </div>
+
+              <!-- Ambient Audio Synthesizer Controls -->
+              <div class="ambient-sound-box">
+                <div class="ambient-header">
+                  <span>🎧 Calming Ambient Sound</span>
+                  <span class="ambient-badge" id="ambient-active-badge">Off</span>
+                </div>
+                <div class="ambient-btn-row">
+                  <button class="btn-ambient" data-ambient="RAIN" id="btn-ambient-rain">
+                    🌧️ Gentle Rain
+                  </button>
+                  <button class="btn-ambient" data-ambient="BREEZE" id="btn-ambient-breeze">
+                    🍃 Soft Breeze
+                  </button>
+                  <button class="btn-ambient active" data-ambient="OFF" id="btn-ambient-off">
+                    🔇 Silence
+                  </button>
+                </div>
+                <span class="field-hint" style="text-align: center; margin-top: 4px;">100% on-device synthesized audio • Zero downloads</span>
+              </div>
+
+              <!-- Centering Breath Reset Prompt -->
+              <div class="centering-breath-card">
+                <div class="breath-info">
+                  <h4>Feeling Study Overload?</h4>
+                  <p>Ground your thoughts with a 1-minute conscious breathing reset before preparing IMs.</p>
+                </div>
+                <button class="btn-secondary" id="btn-start-breathing">
+                  🌬️ <span>1-Min Centering Breath</span>
+                </button>
+              </div>
+            </div>
+          </aside>
         </div>
       </section>
 
@@ -905,6 +1030,85 @@ FEMALE
         <div class="modal-actions">
           <button type="button" class="btn-secondary" id="btn-cancel-bulk-modal">Cancel</button>
           <button type="button" class="btn-primary" id="btn-confirm-bulk-import">Import &amp; Enroll Learners</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 4: Create / Edit Academic Task -->
+    <div class="modal-backdrop" id="modal-task" style="display: none;">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 id="modal-task-title">Add Academic Task</h3>
+          <button class="btn-close-modal" id="btn-close-task-modal">&times;</button>
+        </div>
+        <form id="form-task" class="modal-form">
+          <input type="hidden" id="input-task-id">
+          
+          <div class="form-group">
+            <label for="input-task-title">Task Title *</label>
+            <input type="text" id="input-task-title" placeholder="e.g. Craft 4As Chart &amp; Motivation Flashcards for Demo" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="input-task-subject">Subject / Course Code *</label>
+              <input type="text" id="input-task-subject" placeholder="e.g. ENG 302, FS 1, ED 204" required>
+            </div>
+            <div class="form-group flex-1">
+              <label for="input-task-category">Educ Category *</label>
+              <select id="input-task-category" required>
+                <option value="IMS_PREP">✂️ IMs &amp; Visual Aids</option>
+                <option value="REFLECTION">📝 Field Study Reflection</option>
+                <option value="DEMO_REHEARSAL">🎭 Demo Rehearsal</option>
+                <option value="EXAM_READING">📚 Exam Review &amp; Readings</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="input-task-due">Target Completion Date</label>
+              <input type="date" id="input-task-due">
+            </div>
+            <div class="form-group flex-1">
+              <label for="input-task-minutes">Estimated Study Time (Mins)</label>
+              <input type="number" id="input-task-minutes" placeholder="e.g. 45" min="5" max="300" value="45">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="input-task-materials">Physical Materials Checklist (For IMs / Demos)</label>
+            <input type="text" id="input-task-materials" placeholder="e.g. Cartolina, Double-sided tape, Whiteboard markers, Flashcards">
+            <span class="field-hint">Separate items with commas. Helps you pack everything before demo days.</span>
+          </div>
+
+          <div class="form-group">
+            <label for="input-task-notes">Notes / Professor's Rubric Reminders</label>
+            <textarea id="input-task-notes" rows="3" placeholder="Key instructions, rubric criteria, or notes from your syllabus..."></textarea>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="btn-cancel-task-modal">Cancel</button>
+            <button type="submit" class="btn-primary" id="btn-save-task">Save Task</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL 5: 1-Minute Centering Breathing Overlay -->
+    <div class="modal-backdrop" id="modal-breathing" style="display: none;">
+      <div class="modal-dialog breathing-dialog">
+        <div class="breathing-container">
+          <button class="btn-close-modal breathing-close" id="btn-close-breathing">&times;</button>
+          <div class="breathing-circle-wrapper">
+            <div class="breathing-circle" id="breathing-visual-circle"></div>
+          </div>
+          <h3 class="breathing-instruction" id="breathing-instruction-text">Breathe in gently...</h3>
+          <p class="breathing-sub" id="breathing-sub-text">Inhale calm and clarity through your nose.</p>
+          <div class="breathing-timer">
+            <span id="breathing-seconds-left">60</span>s remaining
+          </div>
+          <button class="btn-subtle" id="btn-finish-breathing">Finished Centering</button>
         </div>
       </div>
     </div>
