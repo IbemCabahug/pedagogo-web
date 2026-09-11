@@ -16,6 +16,7 @@
  */
 
 import { showToast } from './toast.js';
+import { showCalmConfirm } from './calm-dialog.js';
 
 export class AssessmentTracker {
   static STORAGE_KEY = 'pedagogo_assessments';
@@ -40,6 +41,16 @@ export class AssessmentTracker {
       this.render();
       this.bindEvents();
     }
+
+    window.addEventListener('pedagogo:class-deleted', (e) => {
+      const deletedId = e.detail?.classId;
+      this.store = this.loadStore();
+      if (this.selectedClassId === deletedId) {
+        this.selectedClassId = this.classManager?.classes?.[0]?.id || null;
+        this.activeAssessmentId = this.getAssessmentsForClass(this.selectedClassId)[0]?.id || null;
+      }
+      if (this.container) this.render();
+    });
   }
 
   // =========================================================
@@ -525,7 +536,7 @@ export class AssessmentTracker {
     });
   }
 
-  handleAction(action, data = {}) {
+  async handleAction(action, data = {}) {
     switch (action) {
       case 'open-sheet': {
         if (!this.selectedClassId) return;
@@ -559,7 +570,14 @@ export class AssessmentTracker {
       case 'delete-history': {
         const id = data.assessmentId;
         if (!id) return;
-        if (confirm('Delete this score sheet and its recorded scores?')) {
+        const confirmed = await showCalmConfirm({
+          title: 'Delete Score Sheet?',
+          message: 'Delete this score sheet and its recorded scores? This cannot be undone.',
+          confirmText: 'Delete Sheet',
+          cancelText: 'Keep Sheet',
+          tone: 'danger'
+        });
+        if (confirmed) {
           this.deleteAssessment(id);
           showToast('Score sheet removed.', 'info');
           this.render();

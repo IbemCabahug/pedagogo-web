@@ -11,6 +11,7 @@
  */
 
 import { showToast } from './toast.js';
+import { showCalmConfirm } from './calm-dialog.js';
 
 export class AttendanceTracker {
   static STORAGE_KEY = 'pedagogo_attendance_sessions';
@@ -36,6 +37,16 @@ export class AttendanceTracker {
       this.render();
       this.bindEvents();
     }
+
+    window.addEventListener('pedagogo:class-deleted', (e) => {
+      const deletedId = e.detail?.classId;
+      this.store = this.loadStore();
+      if (this.selectedClassId === deletedId) {
+        this.selectedClassId = this.classManager?.classes?.[0]?.id || null;
+        this.activeSessionId = this.getSessionsForClass(this.selectedClassId)[0]?.id || null;
+      }
+      if (this.container) this.render();
+    });
   }
 
   // =========================================================
@@ -527,7 +538,7 @@ export class AttendanceTracker {
     });
   }
 
-  handleAction(action, data = {}) {
+  async handleAction(action, data = {}) {
     switch (action) {
       case 'quick-open': {
         if (!this.selectedClassId) return;
@@ -571,7 +582,14 @@ export class AttendanceTracker {
       case 'delete-history-session': {
         const id = data.sessionId;
         if (!id) return;
-        if (confirm('Delete this roll call and its attendance records?')) {
+        const confirmed = await showCalmConfirm({
+          title: 'Delete Roll Call?',
+          message: 'Delete this roll call session and its recorded attendance entries? This cannot be undone.',
+          confirmText: 'Delete Session',
+          cancelText: 'Keep Session',
+          tone: 'danger'
+        });
+        if (confirmed) {
           this.deleteSession(id);
           showToast('Roll call removed.', 'info');
           this.render();

@@ -153,7 +153,7 @@ export class ClassManager {
 
   addClassroom(data) {
     const newClass = {
-      id: 'cls_' + Date.now(),
+      id: 'cls_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
       subjectCode: data.subjectCode?.trim() || 'NEW SUBJ',
       subjectTitle: data.subjectTitle?.trim() || 'Untitled Class',
       sectionName: data.sectionName?.trim() || 'Section 1',
@@ -191,6 +191,49 @@ export class ClassManager {
     if (this.selectedClassId === id) {
       this.selectedClassId = this.classes.length > 0 ? this.classes[0].id : null;
     }
+
+    // 1. Cascade cleanup orphaned attendance sessions & entries
+    try {
+      const attRaw = localStorage.getItem('pedagogo_attendance_sessions');
+      if (attRaw) {
+        const attStore = JSON.parse(attRaw);
+        if (attStore && Array.isArray(attStore.sessions)) {
+          const removedSessionIds = new Set(
+            attStore.sessions.filter(s => s.classId === id).map(s => s.id)
+          );
+          attStore.sessions = attStore.sessions.filter(s => s.classId !== id);
+          if (Array.isArray(attStore.entries)) {
+            attStore.entries = attStore.entries.filter(e => !removedSessionIds.has(e.sessionId));
+          }
+          localStorage.setItem('pedagogo_attendance_sessions', JSON.stringify(attStore));
+        }
+      }
+    } catch (e) {
+      console.error('Failed to cleanup attendance sessions on class delete:', e);
+    }
+
+    // 2. Cascade cleanup orphaned assessments & scores
+    try {
+      const asmRaw = localStorage.getItem('pedagogo_assessments');
+      if (asmRaw) {
+        const asmStore = JSON.parse(asmRaw);
+        if (asmStore && Array.isArray(asmStore.assessments)) {
+          const removedAsmIds = new Set(
+            asmStore.assessments.filter(a => a.classId === id).map(a => a.id)
+          );
+          asmStore.assessments = asmStore.assessments.filter(a => a.classId !== id);
+          if (Array.isArray(asmStore.scores)) {
+            asmStore.scores = asmStore.scores.filter(s => !removedAsmIds.has(s.assessmentId));
+          }
+          localStorage.setItem('pedagogo_assessments', JSON.stringify(asmStore));
+        }
+      }
+    } catch (e) {
+      console.error('Failed to cleanup assessments on class delete:', e);
+    }
+
+    // 3. Dispatch notification event so active views re-synchronize
+    window.dispatchEvent(new CustomEvent('pedagogo:class-deleted', { detail: { classId: id } }));
   }
 
   // --- Student & Enrollment Operations ---

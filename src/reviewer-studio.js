@@ -5,6 +5,7 @@
  * PPST 7 Domains Alignment, and Realistic PRC Board Licensure Examination Simulation.
  */
 import { showToast } from './toast.js';
+import { showCalmConfirm } from './calm-dialog.js';
 
 export class ReviewerStudio {
   static STORAGE_KEY = 'pedagogo_let_cards';
@@ -1998,17 +1999,29 @@ export class ReviewerStudio {
     });
   }
 
-  promptSubmitExam() {
+  async promptSubmitExam() {
     const answeredCount = Object.keys(this.userAnswers).length;
     const totalCount = this.examDeck.length;
     const unanswered = totalCount - answeredCount;
 
+    let title = 'Submit Board Exam?';
     let msg = 'Are you ready to submit your exam simulation and generate the diagnostic report?';
+    let tone = 'calm';
     if (unanswered > 0) {
+      title = 'Unanswered Questions';
       msg = `You still have ${unanswered} unanswered question(s). Are you sure you want to submit now?`;
+      tone = 'warning';
     }
 
-    if (confirm(msg)) {
+    const confirmed = await showCalmConfirm({
+      title,
+      message: msg,
+      confirmText: 'Submit Exam',
+      cancelText: 'Continue Answering',
+      tone
+    });
+
+    if (confirmed) {
       this.finishExam(false);
     }
   }
@@ -2386,13 +2399,21 @@ export class ReviewerStudio {
 
     // Delete card
     document.querySelectorAll('.btn-delete-card').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const id = btn.dataset.cardId;
-        if (confirm('Remove this card from your LET reviewer deck?')) {
+        const confirmed = await showCalmConfirm({
+          title: 'Remove Reviewer Card?',
+          message: 'Remove this item from your LET question bank? Spaced scheduling history for this item will be removed.',
+          confirmText: 'Remove Card',
+          cancelText: 'Keep Card',
+          tone: 'danger'
+        });
+        if (confirmed) {
           this.cards = this.cards.filter(c => c.id !== id);
           this.saveCards();
           this.render();
+          showToast('Card removed from reviewer deck.', 'info');
         }
       });
     });

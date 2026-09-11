@@ -15,6 +15,7 @@ import { AttendanceTracker } from './attendance-tracker.js';
 import { AssessmentTracker } from './assessment-tracker.js';
 import { LessonPlanBuilder } from './lesson-plan-builder.js';
 import { showToast } from './toast.js';
+import { showCalmConfirm } from './calm-dialog.js';
 
 class PedagogoDeskApp {
   constructor() {
@@ -500,10 +501,17 @@ class PedagogoDeskApp {
 
     const btnDeleteClass = document.getElementById('btn-delete-active-class');
     if (btnDeleteClass) {
-      btnDeleteClass.addEventListener('click', () => {
+      btnDeleteClass.addEventListener('click', async () => {
         const activeClass = this.classManager.getClassroom(this.classManager.selectedClassId);
         if (!activeClass) return;
-        if (confirm(`Are you sure you want to remove ${activeClass.subjectCode} - ${activeClass.sectionName}? All student enrollments in this section will be removed.`)) {
+        const confirmed = await showCalmConfirm({
+          title: `Remove ${activeClass.subjectCode}?`,
+          message: `Are you sure you want to remove ${activeClass.subjectCode} — ${activeClass.sectionName}? All student enrollments, attendance sessions, and score sheets for this section will be cleaned up.`,
+          confirmText: 'Remove Section',
+          cancelText: 'Keep Section',
+          tone: 'danger'
+        });
+        if (confirmed) {
           this.classManager.deleteClassroom(activeClass.id);
           this.renderClassroomView();
         }
@@ -820,8 +828,15 @@ FEMALE
 
         const removeBtn = tr.querySelector('.btn-remove-student');
         if (removeBtn) {
-          removeBtn.addEventListener('click', () => {
-            if (confirm(`Remove ${fullName} from ${activeClass.sectionName}?`)) {
+          removeBtn.addEventListener('click', async () => {
+            const confirmed = await showCalmConfirm({
+              title: `Remove Learner?`,
+              message: `Remove ${fullName} from ${activeClass.sectionName}? The student record will be un-enrolled from this section.`,
+              confirmText: 'Remove Learner',
+              cancelText: 'Keep Learner',
+              tone: 'danger'
+            });
+            if (confirmed) {
               this.classManager.removeStudentFromClass(activeClass.id, st.id);
               this.renderActiveSection();
               this.renderClassCards();
@@ -1374,8 +1389,15 @@ FEMALE
 
       const deleteBtn = card.querySelector('.btn-delete-task');
       if (deleteBtn) {
-        deleteBtn.addEventListener('click', () => {
-          if (confirm(`Remove "${task.title}"?`)) {
+        deleteBtn.addEventListener('click', async () => {
+          const confirmed = await showCalmConfirm({
+            title: 'Remove Task?',
+            message: `Remove "${task.title}" from your coursework list?`,
+            confirmText: 'Remove Task',
+            cancelText: 'Keep Task',
+            tone: 'danger'
+          });
+          if (confirmed) {
             this.taskStudio.deleteTask(task.id);
             this.renderTasksList();
           }

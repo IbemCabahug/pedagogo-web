@@ -3,6 +3,8 @@
  * Aligned with CHED CMO No. 74 & 75, s. 2017 & DepEd PPST Domains.
  */
 
+import { showCalmConfirm } from './calm-dialog.js';
+
 export class FieldStudyNotebook {
   static STORAGE_KEY = 'pedagogo_fs_entries';
 
@@ -250,9 +252,16 @@ export class FieldStudyNotebook {
 
     // Delete entry
     document.querySelectorAll('.btn-delete-fs-entry').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.dataset.entryId;
-        if (confirm('Delete this Field Study observation log?')) {
+        const confirmed = await showCalmConfirm({
+          title: 'Delete Observation Log?',
+          message: 'Delete this Field Study observation entry? This will permanently remove the reflection notes and signature blocks.',
+          confirmText: 'Delete Entry',
+          cancelText: 'Keep Entry',
+          tone: 'danger'
+        });
+        if (confirmed) {
           this.entries = this.entries.filter(e => e.id !== id);
           this.saveEntries();
           this.render();
