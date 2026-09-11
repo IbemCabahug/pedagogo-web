@@ -60,10 +60,10 @@ export class DocumentDesk {
 
       <!-- Drag & Drop Upload Arena -->
       <div class="document-dropzone" id="document-dropzone">
-        <input type="file" id="file-document-input" accept=".pdf,.docx,.pptx,.txt,.md" style="display: none;">
+        <input type="file" id="file-document-input" accept=".pdf,.docx,.pptx,.txt,.md,.png,.jpg,.jpeg,.webp" style="display: none;">
         <div class="dropzone-icon">📥</div>
         <h3 class="dropzone-title">Drop your educational reading here</h3>
-        <p class="dropzone-hint">Supports <strong>PDF</strong>, Word (<strong>.docx</strong>), PowerPoint (<strong>.pptx</strong>), or plain text. 100% parsed locally in your browser.</p>
+        <p class="dropzone-hint">Supports <strong>PDF</strong> (2-column spatial reconstruction), Word (<strong>.docx</strong>), PowerPoint (<strong>.pptx</strong>), plain text, or visual scans/images. 100% parsed locally in your browser.</p>
         
         <div class="dropzone-cta-group">
           <button class="btn-primary" id="btn-browse-file">
@@ -76,9 +76,10 @@ export class DocumentDesk {
         </div>
 
         <div class="dropzone-format-tags">
-          <span class="format-pill">📕 PDF Word-for-Word</span>
-          <span class="format-pill">📘 Word DOCX</span>
+          <span class="format-pill">📕 PDF Spatial Reconstruction</span>
+          <span class="format-pill">📘 Word DOCX (Headings &amp; Tables)</span>
           <span class="format-pill">📙 PowerPoint Slides &amp; Notes</span>
+          <span class="format-pill">🖼️ Images &amp; Scans</span>
           <span class="format-pill">🔒 100% Private (No Cloud Storage)</span>
         </div>
       </div>
@@ -100,6 +101,9 @@ export class DocumentDesk {
     const doc = this.currentDoc;
     const analysis = this.currentAnalysis;
     const wordCount = doc.rawText.split(/\s+/).filter(Boolean).length;
+    const engineBadge = analysis?.modelName 
+      ? `<span class="chip chip-engine" title="Analyzed with ${this.escapeHtml(analysis.modelName)}">${analysis.source === 'GEMINI_API' ? '✨ ' : '⚡ '}${this.escapeHtml(analysis.modelName)}${analysis.isMultimodal ? ' (Multimodal)' : ''}</span>`
+      : '';
 
     this.container.innerHTML = `
       <!-- Workspace Header -->
@@ -115,6 +119,7 @@ export class DocumentDesk {
           <div class="doc-stats-chips">
             <span class="chip">📄 ${doc.totalUnits} ${doc.unitLabel}</span>
             <span class="chip">🔤 ~${wordCount.toLocaleString()} words</span>
+            ${engineBadge}
           </div>
         </div>
 
@@ -550,6 +555,7 @@ export class DocumentDesk {
     return text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/\[((?:Page|Slide|Section|Unit)\s+\d+(?::\s*[^\]]+)?|Primary Text Extraction)\]/gi, '<span class="citation-pill">📌 $1</span>')
       .replace(/^- (.*$)/gim, '<li>$1</li>')
       .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
       .replace(/\n\n/g, '<br><br>');
@@ -954,19 +960,21 @@ export class DocumentDesk {
     }
 
     const currentKey = DocumentSummarizer.getApiKey();
+    const currentModel = DocumentSummarizer.getSelectedModel();
+    const availableModels = DocumentSummarizer.getAvailableModels();
 
     modal.innerHTML = `
       <div class="modal-card gemini-modal-card">
         <div class="modal-header">
           <div class="modal-title-wrap">
             <span class="modal-icon">🔑</span>
-            <h3>Google Gemini Free-Tier Setup</h3>
+            <h3>Google Gemini AI Setup &amp; Model Selection</h3>
           </div>
           <button class="modal-close" id="btn-close-gemini-modal">✕</button>
         </div>
         <div class="modal-body">
           <p class="gemini-modal-desc">
-            To generate live, unlimited pedagogical summaries for your own documents at <strong>$0.00 cost</strong>, enter your free Google Gemini API key.
+            Generate research-backed, high-retention pedagogical study sheets for your own documents at <strong>$0.00 cost</strong> using Google Gemini.
           </p>
 
           <div class="gemini-steps-card">
@@ -978,21 +986,33 @@ export class DocumentDesk {
               <li>Paste it below. It is stored <em>only in your browser's localStorage</em>.</li>
             </ol>
             <div class="gemini-free-limits-badge">
-              ✓ Free Tier: 15 requests/min • 1,500 requests/day • 1,000,000 token context
+              ✓ Free Tier: 15 requests/min • 1,500 requests/day • 1,000,000 token context window
             </div>
+          </div>
+
+          <div class="form-group">
+            <label for="gemini-model-select">Active AI Model Tier:</label>
+            <select id="gemini-model-select" class="form-input form-select" style="font-weight: 600; cursor: pointer;">
+              ${availableModels.map(m => `
+                <option value="${m.id}" ${m.id === currentModel ? 'selected' : ''}>
+                  ${this.escapeHtml(m.name)}
+                </option>
+              `).join('')}
+            </select>
+            <span class="input-hint" id="gemini-model-desc-hint">${availableModels.find(m => m.id === currentModel)?.desc || ''}</span>
           </div>
 
           <div class="form-group">
             <label for="gemini-api-key-input">Your Gemini API Key:</label>
             <input type="password" id="gemini-api-key-input" class="form-input" placeholder="AIzaSy..." value="${this.escapeHtml(currentKey)}">
-            <span class="input-hint">Your key is never sent to our servers. All requests go directly to Google's API.</span>
+            <span class="input-hint">Your key is never sent to our servers. All requests go directly from your browser to Google's API.</span>
           </div>
         </div>
         <div class="modal-footer">
           ${currentKey ? '<button class="btn-subtle btn-danger-subtle" id="btn-remove-gemini-key">Remove Key</button>' : ''}
           <div class="footer-actions-right">
             <button class="btn-subtle" id="btn-cancel-gemini-modal">Cancel</button>
-            <button class="btn-primary" id="btn-save-gemini-key">Save Key</button>
+            <button class="btn-primary" id="btn-save-gemini-key">Save Settings</button>
           </div>
         </div>
       </div>
@@ -1005,6 +1025,15 @@ export class DocumentDesk {
     const saveBtn = document.getElementById('btn-save-gemini-key');
     const removeBtn = document.getElementById('btn-remove-gemini-key');
     const inputKey = document.getElementById('gemini-api-key-input');
+    const modelSelect = document.getElementById('gemini-model-select');
+    const modelHint = document.getElementById('gemini-model-desc-hint');
+
+    if (modelSelect && modelHint) {
+      modelSelect.addEventListener('change', () => {
+        const found = availableModels.find(m => m.id === modelSelect.value);
+        if (found) modelHint.textContent = found.desc;
+      });
+    }
 
     const closeModal = () => modal.classList.remove('active');
 
@@ -1014,9 +1043,13 @@ export class DocumentDesk {
     if (saveBtn && inputKey) {
       saveBtn.addEventListener('click', () => {
         DocumentSummarizer.setApiKey(inputKey.value);
+        if (modelSelect) {
+          DocumentSummarizer.setSelectedModel(modelSelect.value);
+        }
         closeModal();
         this.render();
-        showToast('Gemini Flash API Key saved! Full pedagogical auto-summarization is active.', 'success');
+        const activeModelName = availableModels.find(m => m.id === (modelSelect?.value || currentModel))?.name || 'Gemini 2.0 Flash';
+        showToast(`${activeModelName} settings saved! High-accuracy auto-summarization is active.`, 'success');
       });
     }
 

@@ -232,7 +232,21 @@ export class ClassManager {
       console.error('Failed to cleanup assessments on class delete:', e);
     }
 
-    // 3. Dispatch notification event so active views re-synchronize
+    // 3. Cascade cleanup orphaned anecdotal records
+    try {
+      const anecRaw = localStorage.getItem('pedagogo_anecdotal_records');
+      if (anecRaw) {
+        const anecList = JSON.parse(anecRaw);
+        if (Array.isArray(anecList)) {
+          const cleaned = anecList.filter(e => e.classId !== id);
+          localStorage.setItem('pedagogo_anecdotal_records', JSON.stringify(cleaned));
+        }
+      }
+    } catch (e) {
+      console.error('Failed to cleanup anecdotal records on class delete:', e);
+    }
+
+    // 4. Dispatch notification event so active views re-synchronize
     window.dispatchEvent(new CustomEvent('pedagogo:class-deleted', { detail: { classId: id } }));
   }
 

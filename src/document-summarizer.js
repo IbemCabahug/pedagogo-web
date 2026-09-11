@@ -10,6 +10,7 @@
 
 export class DocumentSummarizer {
   static STORAGE_KEY = 'pedagogo_gemini_key';
+  static MODEL_STORAGE_KEY = 'pedagogo_gemini_model';
 
   static getApiKey() {
     return localStorage.getItem(this.STORAGE_KEY) || '';
@@ -28,6 +29,22 @@ export class DocumentSummarizer {
     return Boolean(key && key.length > 10);
   }
 
+  static getAvailableModels() {
+    return [
+      { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Recommended)', desc: 'Next-gen multimodal, native PDF reading, high accuracy & speed' },
+      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Legacy)', desc: 'Fast, lightweight and stable extraction' },
+      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Deep Reasoner)', desc: 'Maximum analytical depth for complex theories & curriculum orders' }
+    ];
+  }
+
+  static getSelectedModel() {
+    return localStorage.getItem(this.MODEL_STORAGE_KEY) || 'gemini-2.0-flash';
+  }
+
+  static setSelectedModel(modelId) {
+    localStorage.setItem(this.MODEL_STORAGE_KEY, modelId || 'gemini-2.0-flash');
+  }
+
   /**
    * Research-grounded system prompt engineered specifically for pre-service teachers
    */
@@ -35,17 +52,20 @@ export class DocumentSummarizer {
     return `You are Pedagogo AI, a world-class cognitive learning specialist and master teacher educator.
 Your mission is to transform dense educational, academic, and pedagogical reading materials (curriculum guides, textbook chapters, developmental theories, DepEd orders, or lecture slides) into an exemplary, high-retention study guide for pre-service teachers and education students.
 
-You MUST structure your response into EXACTLY five markdown sections, adhering strictly to the research-backed frameworks below:
+CRITICAL ACCURACY & GROUNDING RULES:
+1. CITATION BADGES: In sections 1, 2, and 4, explicitly include source location badges, e.g. [Page 3], [Slide 5], or [Section 2], so students can cross-reference the original text.
+2. STRICT GROUNDING: Stick faithfully to the principles, research findings, and legal/curriculum standards provided in the text. Do NOT hallucinate external policies or unstated facts.
+3. ADHERENCE TO PEDAGOGICAL PILLARS: You MUST structure your response into EXACTLY five markdown sections below:
 
 ### 1. 🎓 Cornell Synthesis & Active Cues
 *Grounded in Walter Pauk's Cornell System for spatial metacognition and post-reading recall.*
-- **Macro-Synthesis (2–3 sentences):** Distill the central premise, purpose, and enduring understanding of the text.
+- **Macro-Synthesis (2–3 sentences):** Distill the central premise, purpose, and enduring understanding of the text. Include primary source citation [Page X].
 - **Active Recall Cue Questions:** List 3 high-leverage trigger questions that test deep comprehension (not trivial factoids).
 
 ### 2. 🧩 Structured Concept Chunks
 *Grounded in John Sweller's Cognitive Load Theory (1988).*
 - Break down the core principles into 3 to 5 digestible thematic chunks.
-- Use **bolded keywords** and concise, structured bullet points to minimize extraneous cognitive load.
+- For each chunk, provide a bolded title, exact source tag (e.g. [Page X] or [Slide Y]), **bolded keywords**, and concise bullet points to minimize extraneous cognitive load.
 - If applicable, explicitly note the Bloom's Taxonomy cognitive domain or curriculum alignment (DepEd K-12/MATATAG, CHED).
 
 ### 3. 🧑‍🏫 "Teach It Simply" (Classroom Translation)
@@ -60,7 +80,7 @@ You MUST structure your response into EXACTLY five markdown sections, adhering s
 - Present a Markdown comparison table contrasting them across alignable dimensions:
   | Comparison Dimension | Concept / Approach A | Concept / Approach B |
   | :--- | :--- | :--- |
-  | **Core Premise** | ... | ... |
+  | **Core Premise** | ... [Page X] | ... [Page Y] |
   | **Teacher's Role** | ... | ... |
   | **Student's Activity** | ... | ... |
   | **Authentic Classroom Example**| ... | ... |
@@ -68,7 +88,7 @@ You MUST structure your response into EXACTLY five markdown sections, adhering s
 
 ### 5. 🎯 Licensure (LET) Retrieval Practice Checkpoint
 *Grounded in Roediger & Karpicke (2006) on the Testing Effect and Active Retrieval.*
-- Generate 3 scenario-based multiple choice questions modeled after actual Professional Education (ProfEd) Licensure Examination for Teachers (LET) questions.
+- Generate 3 scenario-based multiple choice questions modeled after actual Professional Education (ProfEd) Licensure Examination for Teachers (LET) questions based directly on the reading.
 - Format each question cleanly:
   **Question 1:** [Scenario-based stem]
   - A) [Option]
@@ -78,80 +98,101 @@ You MUST structure your response into EXACTLY five markdown sections, adhering s
   - **Correct Answer:** [Letter]
   - **Pedagogical Rationalization:** [Clear explanation of why this answer is correct and why common distractors are incorrect based on pedagogical principles].
 
-Maintain a warm, encouraging, and academically rigorous tone throughout.`;
+Maintain an encouraging, rigorous, and inspiring tone throughout.`;
   }
 
   /**
-   * Run pedagogical analysis on extracted text using Google Gemini Flash API.
-   * If no key is set or offline demo is requested, extracts a structured pedagogical
-   * synthesis directly from the uploaded document's verbatim text in-browser.
+   * Run pedagogical analysis on extracted text or native multimodal document.
+   * If no key is set, runs our client-side TextRank extractive NLP engine in-browser.
    */
   static async summarize(extractedDoc) {
     const apiKey = this.getApiKey();
 
     // If no key is set:
     if (!apiKey) {
-      // Check if it's the explicitly requested built-in sample
       if (extractedDoc.filename && (extractedDoc.filename.toLowerCase().includes('sample') || extractedDoc.filename.toLowerCase().includes('piaget'))) {
         return this.generateFallbackAnalysis(extractedDoc);
       }
-      // For user's uploaded document, run real client-side extractive synthesis on their text!
       return this.extractPedagogicalAnalysis(extractedDoc);
     }
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const selectedModel = this.getSelectedModel();
+    const modelsToTry = [selectedModel];
+    if (selectedModel !== 'gemini-1.5-flash') {
+      modelsToTry.push('gemini-1.5-flash');
+    }
+
+    // Build prompt payload: check if multimodal inline document is available (PDF or Image)
+    const canUseMultimodal = Boolean(extractedDoc.base64Data && (extractedDoc.fileType === 'PDF' || extractedDoc.fileType === 'IMAGE'));
     
-    // Format prompt with verbatim document contents
-    const promptPayload = {
-      contents: [
+    let parts = [];
+    if (canUseMultimodal) {
+      parts = [
         {
-          role: 'user',
-          parts: [
-            {
-              text: `${this.getSystemPrompt()}\n\nHere is the document to analyze:\n**Document Title:** ${extractedDoc.filename} (${extractedDoc.fileType})\n\n**Verbatim Text:**\n${extractedDoc.rawText.slice(0, 80000)}`
-            }
-          ]
+          text: `${this.getSystemPrompt()}\n\nPlease perform an exhaustive, high-accuracy pedagogical analysis of the following educational document:\n**Document Title:** ${extractedDoc.filename} (${extractedDoc.fileType})\n**Total Units:** ${extractedDoc.totalUnits} ${extractedDoc.unitLabel}`
+        },
+        {
+          inlineData: {
+            mimeType: extractedDoc.mimeType || (extractedDoc.fileType === 'PDF' ? 'application/pdf' : 'image/jpeg'),
+            data: extractedDoc.base64Data
+          }
         }
-      ],
+      ];
+    } else {
+      // High-capacity text prompt (up to 500,000 characters)
+      parts = [
+        {
+          text: `${this.getSystemPrompt()}\n\nHere is the educational reading material to analyze:\n**Document Title:** ${extractedDoc.filename} (${extractedDoc.fileType})\n**Total Units:** ${extractedDoc.totalUnits} ${extractedDoc.unitLabel}\n\n**Verbatim Document Content:**\n${extractedDoc.rawText.slice(0, 500000)}`
+        }
+      ];
+    }
+
+    const promptPayload = {
+      contents: [{ role: 'user', parts }],
       generationConfig: {
-        temperature: 0.3,
+        temperature: 0.2, // Lower temperature for high factual accuracy
         topP: 0.95,
-        maxOutputTokens: 4096
+        maxOutputTokens: 8192
       }
     };
 
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(promptPayload)
-      });
+    // Try primary model, then fallback if needed
+    for (const model of modelsToTry) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(promptPayload)
+        });
 
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        const errMsg = errJson?.error?.message || `HTTP ${response.status} ${response.statusText}`;
-        console.warn('Gemini API returned error, switching to local extractive NLP:', errMsg);
-        return this.extractPedagogicalAnalysis(extractedDoc);
+        if (!response.ok) {
+          const errJson = await response.json().catch(() => ({}));
+          const errMsg = errJson?.error?.message || `HTTP ${response.status} ${response.statusText}`;
+          console.warn(`Gemini API (${model}) returned error: ${errMsg}. Trying fallback if available.`);
+          continue;
+        }
+
+        const data = await response.json();
+        const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (generatedText && generatedText.trim().length > 50) {
+          const modelMeta = this.getAvailableModels().find(m => m.id === model);
+          return {
+            source: 'GEMINI_API',
+            modelName: modelMeta?.name || model,
+            isMultimodal: canUseMultimodal,
+            markdown: generatedText,
+            analyzedAt: new Date().toISOString()
+          };
+        }
+      } catch (err) {
+        console.warn(`Fetch error for model ${model}:`, err);
       }
-
-      const data = await response.json();
-      const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!generatedText) {
-        console.warn('Gemini API returned empty parts, switching to local extractive NLP.');
-        return this.extractPedagogicalAnalysis(extractedDoc);
-      }
-
-      return {
-        source: 'GEMINI_API',
-        markdown: generatedText,
-        analyzedAt: new Date().toISOString()
-      };
-    } catch (err) {
-      console.warn('Gemini API request failed, falling back to in-browser extractive analysis:', err);
-      // Fallback to local extractive analysis of the actual document
-      return this.extractPedagogicalAnalysis(extractedDoc);
     }
+
+    console.warn('All Gemini API attempts exhausted. Switching to local TextRank extractive engine.');
+    return this.extractPedagogicalAnalysis(extractedDoc);
   }
 
   /**
@@ -185,19 +226,19 @@ Lev Vygotsky: Socio-Cultural Theory & The ZPD
 In contrast, Lev Semionovich Vygotsky posited that cognitive development originates externally through social interaction and cultural tools, particularly language. Vygotsky rejected universal biological stages, arguing instead that learning precedes development. Children internalize interpersonal dialogues into intrapersonal inner speech, which subsequently directs thought.
 Central to Vygotsky's pedagogy is the Zone of Proximal Development (ZPD): the distance between a learner's actual development level (what they can accomplish independently) and their potential development level (what they can accomplish under adult guidance or in collaboration with more capable peers - MKO). Jerome Bruner later operationalized this through Scaffolding: temporary, calibrated pedagogical support gradually dismantled as the learner achieves autonomy.`,
         synthesis: `### 1. 🎓 Cornell Synthesis & Active Cues
-- **Macro-Synthesis:** While both Piaget and Vygotsky agree that learners construct their own understanding rather than passively receiving data, Piaget argues that **biological maturation precedes learning** through internal equilibration, whereas Vygotsky proves that **social and cultural interaction precedes and pulls cognitive development forward**.
+- **Macro-Synthesis [Page 1]:** While both Piaget and Vygotsky agree that learners construct their own understanding rather than passively receiving data, Piaget argues that **biological maturation precedes learning** through internal equilibration, whereas Vygotsky proves that **social and cultural interaction precedes and pulls cognitive development forward**.
 - **Active Recall Cue Questions:**
-  1. *What distinguishes Piaget's concept of assimilation from accommodation during cognitive disequilibrium?*
-  2. *How does Vygotsky's Zone of Proximal Development (ZPD) transform the traditional teacher-centered classroom into a collaborative learning environment?*
-  3. *Why is language considered the primary psychological tool in Vygotskian cognitive development?*
+  1. *What distinguishes Piaget's concept of assimilation from accommodation during cognitive disequilibrium? [Page 2]*
+  2. *How does Vygotsky's Zone of Proximal Development (ZPD) transform the traditional teacher-centered classroom into a collaborative learning environment? [Page 3]*
+  3. *Why is language considered the primary psychological tool in Vygotskian cognitive development? [Page 3]*
 
 ---
 
 ### 2. 🧩 Structured Concept Chunks
-- **Piagetian Cognitive Constructivism:**
+- **Piagetian Cognitive Constructivism [Page 2]:**
   - **Schema & Equilibration:** Mental filing cabinets reorganized via *Assimilation* (fitting new data into existing boxes) and *Accommodation* (building new boxes).
   - **Development Precedes Learning:** Biological readiness is an absolute prerequisite; pushing formal logic onto a preoperational child causes rote compliance rather than true cognitive assimilation.
-- **Vygotskian Socio-Cultural Constructivism:**
+- **Vygotskian Socio-Cultural Constructivism [Page 3]:**
   - **Social Origin of Mind:** Thoughts originate as social dialogue before being internalized as private inner speech.
   - **Zone of Proximal Development (ZPD):** The sweet spot where instruction must reside—neither too simple (boredom) nor too difficult (frustration).
   - **More Knowledgeable Other (MKO) & Scaffolding:** Calibrated temporary bridges provided by teachers or capable peers.
@@ -215,7 +256,7 @@ Central to Vygotsky's pedagogy is the Zone of Proximal Development (ZPD): the di
 
 | Comparison Dimension | Piaget (Cognitive Constructivism) | Vygotsky (Socio-Cultural Constructivism) |
 | :--- | :--- | :--- |
-| **Primary Driver of Growth** | Individual exploration & biological maturation | Social interaction, dialogue, & cultural tools |
+| **Primary Driver of Growth** | Individual exploration & biological maturation [Page 2] | Social interaction, dialogue, & cultural tools [Page 3] |
 | **Relationship of Learning & Dev.**| **Development precedes learning** (must be mature) | **Learning precedes development** (pulls growth) |
 | **Role of Language** | Self-directed monologue reflecting egocentrism | Primary psychological tool for thought formation |
 | **Teacher's Role** | Facilitator of hands-on, rich environments | Collaborator, mediator, and scaffolding architect |
@@ -232,7 +273,7 @@ Central to Vygotsky's pedagogy is the Zone of Proximal Development (ZPD): the di
 - C) Zone of Proximal Development
 - D) Egocentric Speech Plateau
 - **Correct Answer:** **C**
-- **Pedagogical Rationalization:** Joshua's ability to solve the problem with guided peer collaboration that he could not solve alone perfectly exemplifies performance within the Zone of Proximal Development (ZPD). Option A is Piagetian and biologically inappropriate for an 8-year-old.
+- **Pedagogical Rationalization:** Joshua's ability to solve the problem with guided peer collaboration that he could not solve alone perfectly exemplifies performance within the Zone of Proximal Development (ZPD) [Page 3]. Option A is Piagetian and biologically inappropriate for an 8-year-old.
 
 **Question 2:** In an elementary science class, Teacher Ben introduces the concept of mammals. A student insists that whales cannot be mammals because "they live in water like fish." Teacher Ben then shows a video explaining that whales breathe air and nurse their young, causing the student to adjust their mental definition of mammals. In Piaget's terminology, what process just took place?
 - A) Assimilation
@@ -240,7 +281,7 @@ Central to Vygotsky's pedagogy is the Zone of Proximal Development (ZPD): the di
 - C) Object Permanence
 - D) Classical Conditioning
 - **Correct Answer:** **B**
-- **Pedagogical Rationalization:** Accommodation occurs when a learner modifies an existing schema (or creates a new one) because new conflicting information cannot fit into the current framework. Assimilation (A) would only apply if the new fact fit without changing the category rule.
+- **Pedagogical Rationalization:** Accommodation occurs when a learner modifies an existing schema (or creates a new one) because new conflicting information cannot fit into the current framework [Page 2]. Assimilation (A) would only apply if the new fact fit without changing the category rule.
 
 **Question 3:** Which teaching practice reflects a misinterpretation of Jerome Bruner's concept of educational scaffolding?
 - A) Providing sentence frames during an essay pre-writing session.
@@ -248,7 +289,7 @@ Central to Vygotsky's pedagogy is the Zone of Proximal Development (ZPD): the di
 - C) Keeping permanent cue cards taped to student desks throughout the entire school year.
 - D) Gradually withdrawing graphic organizers as students demonstrate mastery.
 - **Correct Answer:** **C**
-- **Pedagogical Rationalization:** The fundamental pedagogical criterion of scaffolding is that it is **temporary** and intentionally dismantled as learner independence increases. Leaving permanent cue cards (C) creates learned helplessness rather than true cognitive autonomy.`
+- **Pedagogical Rationalization:** The fundamental pedagogical criterion of scaffolding is that it is **temporary** and intentionally dismantled as learner independence increases [Page 3]. Leaving permanent cue cards (C) creates learned helplessness rather than true cognitive autonomy.`
       },
       {
         id: 'sample-child-protection',
@@ -262,20 +303,20 @@ Section 1: Zero-Tolerance Policy for Child Abuse and Exploitation. All schools m
 Section 2: Positive and Non-Violent Discipline. Corporal punishment in any form (physical blows, humiliating public ridicule, forcing pupils to stay in uncomfortable postures) is strictly prohibited and subject to administrative sanction.
 Section 3: Child Protection Committee (CPC). Every elementary and secondary school shall establish a CPC composed of the School Head, Guidance Counselor, Faculty Representative, Parent-Teacher Association President, Barangay Representative, and Student Council President.`,
         synthesis: `### 1. 🎓 Cornell Synthesis & Active Cues
-- **Macro-Synthesis:** DepEd Order No. 40, s. 2012 establishes an unequivocal **zero-tolerance mandate against child abuse, exploitation, and corporal punishment** in Philippine schools, institutionalizing school-level Child Protection Committees (CPCs) and requiring educators to practice proactive, positive discipline.
+- **Macro-Synthesis [Section 1]:** DepEd Order No. 40, s. 2012 establishes an unequivocal **zero-tolerance mandate against child abuse, exploitation, and corporal punishment** in Philippine schools, institutionalizing school-level Child Protection Committees (CPCs) and requiring educators to practice proactive, positive discipline.
 - **Active Recall Cue Questions:**
-  1. *What specific practices constitute illegal corporal punishment under DepEd regulations?*
-  2. *Who are the mandatory multi-sectoral members of a school's Child Protection Committee (CPC)?*
-  3. *How does positive discipline distinguish between managing behavior and inflicting punitive humiliation?*
+  1. *What specific practices constitute illegal corporal punishment under DepEd regulations? [Section 2]*
+  2. *Who are the mandatory multi-sectoral members of a school's Child Protection Committee (CPC)? [Section 3]*
+  3. *How does positive discipline distinguish between managing behavior and inflicting punitive humiliation? [Section 2]*
 
 ---
 
 ### 2. 🧩 Structured Concept Chunks
-- **Zero-Tolerance Stance:**
+- **Zero-Tolerance Stance [Section 1]:**
   - Absolute prohibition of corporal punishment, harsh verbal reprimands, and discriminatory practices across all public and private basic education institutions.
-- **Child Protection Committee (CPC) Structure:**
+- **Child Protection Committee (CPC) Structure [Section 3]:**
   - Chaired by School Head, joined by Guidance Counselor/Designee, Faculty Rep, PTA President, Barangay Council Rep, and Supreme Pupil/Student Government President.
-- **Positive Non-Violent Discipline:**
+- **Positive Non-Violent Discipline [Section 2]:**
   - Replacement of punitive isolation with restorative problem-solving, behavioral reflection, and clear, respectful expectations.
 
 ---
@@ -291,10 +332,10 @@ Section 3: Child Protection Committee (CPC). Every elementary and secondary scho
 
 | Comparison Dimension | Punitive / Corporal Punishment | Positive & Non-Violent Discipline |
 | :--- | :--- | :--- |
-| **Underlying Motivation** | Driven by teacher frustration, anger, or coercion | Driven by teaching self-regulation and empathy |
+| **Underlying Motivation** | Driven by teacher frustration, anger, or coercion | Driven by teaching self-regulation and empathy [Section 2] |
 | **Learner's Emotional State** | Fear, shame, resentment, avoidance | Felt safety, accountability, mutual respect |
 | **Long-Term Behavioral Impact** | Increases aggression and covert misbehavior | Develops internal moral compass and self-control |
-| **DepEd Administrative Status** | **Strictly prohibited; grounds for dismissal** | **Mandated professional standard (PPST Domain 2)** |
+| **DepEd Administrative Status** | **Strictly prohibited; grounds for dismissal** [Section 1] | **Mandated professional standard (PPST Domain 2)** |
 | **Typical Intervention** | Shouting, kneeling on salt, public ridicule | Private conferencing, logical restitution, reflection |
 
 ---
@@ -315,7 +356,7 @@ Section 3: Child Protection Committee (CPC). Every elementary and secondary scho
 - C) Municipal Mayor or District Congressman
 - D) Barangay Council Representative
 - **Correct Answer:** **C**
-- **Pedagogical Rationalization:** The Child Protection Committee operates at the school-community level and includes the School Head, Guidance Counselor, Faculty Representative, PTA President, Barangay Council Representative, and Student Council President. High-level political officials like the Mayor or Congressman (C) are not part of the school CPC.`
+- **Pedagogical Rationalization:** The Child Protection Committee operates at the school-community level and includes the School Head, Guidance Counselor, Faculty Representative, PTA President, Barangay Council Representative, and Student Council President [Section 3]. High-level political officials like the Mayor or Congressman (C) are not part of the school CPC.`
       }
     ];
   }
@@ -326,109 +367,212 @@ Section 3: Child Protection Committee (CPC). Every elementary and secondary scho
 
     return {
       source: 'LOCAL_PEDAGOGICAL_ENGINE',
+      modelName: 'Built-in Research Benchmark',
       markdown: matched.synthesis,
       analyzedAt: new Date().toISOString()
     };
   }
 
   /**
-   * Genuine client-side extractive pedagogical NLP engine.
-   * Analyzes the user's uploaded document verbatim text directly in the browser.
+   * Client-side TextRank Graph NLP & Pedagogical Pattern Extractor.
+   * Genuinely analyzes the user's uploaded document text in-browser when offline.
    */
   static extractPedagogicalAnalysis(extractedDoc) {
     const raw = extractedDoc.rawText || '';
     const filename = extractedDoc.filename || 'Educational Reading';
     const cleanTitle = filename.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
 
-    // Normalize and clean text
+    // Normalize text into clean sentences
     const cleanText = raw.replace(/\r?\n+/g, ' ').replace(/\s+/g, ' ').trim();
     const sentences = cleanText
       .split(/(?<=[.?!])\s+(?=[A-Z0-9"“])/)
       .map(s => s.trim())
-      .filter(s => s.length > 25 && s.length < 350);
+      .filter(s => s.length >= 30 && s.length <= 400);
 
-    // Stopwords list
+    // Stopwords for academic English & pedagogical boilerplate
     const stopWords = new Set([
-      'the', 'and', 'for', 'that', 'with', 'this', 'from', 'have', 'were', 'which',
-      'their', 'there', 'they', 'will', 'about', 'would', 'could', 'should', 'these',
-      'those', 'been', 'being', 'between', 'under', 'through', 'after', 'before', 'where',
-      'when', 'what', 'into', 'more', 'most', 'other', 'some', 'such', 'only', 'also',
-      'each', 'than', 'them', 'then', 'very', 'even', 'page', 'unit', 'chapter', 'module'
+      'a', 'an', 'the', 'and', 'or', 'but', 'for', 'nor', 'so', 'yet', 'of', 'in', 'to',
+      'with', 'on', 'at', 'by', 'from', 'up', 'about', 'into', 'over', 'after', 'beneath',
+      'under', 'above', 'is', 'am', 'are', 'was', 'were', 'be', 'being', 'been', 'have',
+      'has', 'had', 'do', 'does', 'did', 'shall', 'will', 'should', 'would', 'may',
+      'might', 'must', 'can', 'could', 'that', 'which', 'who', 'whom', 'this', 'these',
+      'those', 'then', 'there', 'here', 'when', 'where', 'why', 'how', 'all', 'any',
+      'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'not',
+      'only', 'own', 'same', 'than', 'too', 'very', 'page', 'slide', 'section', 'unit',
+      'figure', 'table', 'chapter', 'module', 'text', 'document', 'reading', 'also'
     ]);
 
-    // Word frequency analysis to extract genuine topical concepts
+    // Tokenize sentences into meaningful word sets
+    const sentenceWordSets = sentences.map(s => {
+      const words = (s.toLowerCase().match(/\b[a-z]{3,}\b/g) || []).filter(w => !stopWords.has(w));
+      return new Set(words);
+    });
+
+    // Word frequencies
     const wordCounts = {};
-    const words = cleanText.toLowerCase().match(/\b[a-z]{4,}\b/g) || [];
-    for (const w of words) {
-      if (!stopWords.has(w)) {
+    for (const wSet of sentenceWordSets) {
+      for (const w of wSet) {
         wordCounts[w] = (wordCounts[w] || 0) + 1;
       }
     }
 
-    const sortedWords = Object.entries(wordCounts)
+    // Top salient keywords
+    const sortedKeywords = Object.entries(wordCounts)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 12)
+      .slice(0, 10)
       .map(([w]) => w.charAt(0).toUpperCase() + w.slice(1));
 
-    const topKeywords = sortedWords.slice(0, 5);
-    const keyTerm1 = topKeywords[0] || 'Core Pedagogical Principle';
-    const keyTerm2 = topKeywords[1] || 'Instructional Implementation';
-    const keyTerm3 = topKeywords[2] || 'Educational Assessment';
-    const keyTerm4 = topKeywords[3] || 'Curricular Competency';
+    const keyTerm1 = sortedKeywords[0] || 'Curricular Foundation';
+    const keyTerm2 = sortedKeywords[1] || 'Instructional Strategy';
+    const keyTerm3 = sortedKeywords[2] || 'Assessment Practice';
 
-    // Sentence ranking for Walter Pauk's Macro-Synthesis
-    const scoredSentences = sentences.map((sentence, idx) => {
-      let score = 0;
-      const lower = sentence.toLowerCase();
-      topKeywords.forEach(k => {
-        if (lower.includes(k.toLowerCase())) score += 3;
-      });
-      // Position boost for introductory definitions
-      if (idx < 5) score += 4;
-      if (sentence.length < 50 || sentence.length > 250) score -= 2;
-      return { sentence, score, idx };
-    });
+    // --- TextRank Graph Algorithm (Power Iteration) ---
+    const n = sentences.length;
+    let scores = new Array(n).fill(1.0);
 
-    scoredSentences.sort((a, b) => b.score - a.score);
-    const topSentences = scoredSentences.slice(0, 3).sort((a, b) => a.idx - b.idx);
-    
-    const macroSynthesis = topSentences.length > 0 
-      ? topSentences.map(s => s.sentence).join(' ') 
-      : `This document explores essential curricular foundations concerning ${cleanTitle}, establishing key pedagogical structures and actionable classroom implications for pre-service educators.`;
+    if (n > 1) {
+      // Build similarity graph
+      const weights = Array.from({ length: n }, () => new Array(n).fill(0));
+      const degrees = new Array(n).fill(0);
 
-    // Active Recall Cue Questions
-    const cueQuestions = [
-      `How does this text define the primary role and scope of **${keyTerm1}**?`,
-      `What are the practical classroom conditions necessary to effectively implement **${keyTerm2}**?`,
-      `In what ways does **${keyTerm3}** influence student engagement and learning outcomes?`,
-      `What distinguishing attributes differentiate **${keyTerm1}** from related curricular concepts?`
-    ];
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          const setA = sentenceWordSets[i];
+          const setB = sentenceWordSets[j];
+          if (setA.size === 0 || setB.size === 0) continue;
 
-    // Structured Concept Chunks from actual document units
+          let intersection = 0;
+          for (const word of setA) {
+            if (setB.has(word)) intersection++;
+          }
+
+          if (intersection > 0) {
+            const sim = intersection / (Math.log(setA.size + 1) + Math.log(setB.size + 1));
+            weights[i][j] = sim;
+            weights[j][i] = sim;
+            degrees[i] += sim;
+            degrees[j] += sim;
+          }
+        }
+      }
+
+      // 15 iterations of PageRank
+      const d = 0.85;
+      for (let iter = 0; iter < 15; iter++) {
+        const nextScores = new Array(n).fill((1 - d));
+        for (let i = 0; i < n; i++) {
+          for (let j = 0; j < n; j++) {
+            if (i !== j && degrees[j] > 0) {
+              nextScores[i] += d * (weights[j][i] / degrees[j]) * scores[j];
+            }
+          }
+        }
+        scores = nextScores;
+      }
+    }
+
+    // Rank sentences by TextRank score
+    const rankedSentences = sentences.map((sentence, idx) => ({
+      sentence,
+      score: scores[idx] || 0,
+      idx
+    }));
+
+    rankedSentences.sort((a, b) => b.score - a.score);
+    const centroidSentences = rankedSentences.slice(0, 3).sort((a, b) => a.idx - b.idx);
+    const macroSynthesis = centroidSentences.length > 0
+      ? centroidSentences.map(s => s.sentence).join(' ')
+      : `This document establishes foundational pedagogical principles in ${cleanTitle}, articulating key conceptual structures and instructional considerations for educators.`;
+
+    // --- Pedagogical Definition Pattern Extractor ---
+    const definitionMatches = [];
+    const definitionRegex = /(?:([A-Z][a-zA-Z\s]{2,30})\s+(?:is defined as|refers to|can be described as|means|is characterized by)\s+([^.;]{15,180}))/gi;
+
+    for (const s of sentences) {
+      let match;
+      while ((match = definitionRegex.exec(s)) !== null) {
+        if (match[1] && match[2]) {
+          definitionMatches.push({
+            term: match[1].trim(),
+            definition: match[2].trim(),
+            fullSentence: s
+          });
+        }
+      }
+      if (definitionMatches.length >= 4) break;
+    }
+
+    // --- Contrastive Pattern Extractor ---
+    const contrastMatches = [];
+    const contrastRegex = /(?:([^,.;]{10,80})\s+(?:whereas|unlike|in contrast to|on the other hand|as opposed to|while)\s+([^,.;]{10,80}))/gi;
+
+    for (const s of sentences) {
+      let match;
+      while ((match = contrastRegex.exec(s)) !== null) {
+        if (match[1] && match[2]) {
+          contrastMatches.push({
+            partA: match[1].trim(),
+            partB: match[2].trim()
+          });
+        }
+      }
+      if (contrastMatches.length >= 2) break;
+    }
+
+    // --- Unit-Aware Concept Chunks ---
     const units = extractedDoc.units || [];
     let chunksMarkdown = '';
 
     if (units.length > 0) {
-      const unitSnippets = units.slice(0, 4).map((u, i) => {
+      chunksMarkdown = units.slice(0, 4).map((u, i) => {
         const uLines = u.text.split('\n').map(l => l.trim()).filter(l => l.length > 30);
-        const excerpt = uLines.slice(0, 2).join(' ') || u.text.slice(0, 220);
-        const chunkTitle = topKeywords[i] || `Core Framework (Part ${i + 1})`;
-        return `#### Chunk ${i + 1}: ${chunkTitle} • ${u.title || 'Section ' + (i + 1)}\n- **Key Text Excerpt:** "${excerpt}"\n- **Pedagogical Meaning:** Establishes critical structural foundations in ${cleanTitle}, directly translating theoretical constructs into student learning.`;
-      });
-      chunksMarkdown = unitSnippets.join('\n\n');
+        const excerpt = uLines.slice(0, 2).join(' ') || u.text.slice(0, 240);
+        const chunkTitle = sortedKeywords[i] || `Pedagogical Framework (Part ${i + 1})`;
+        return `#### Chunk ${i + 1}: ${chunkTitle} • [${u.title || 'Unit ' + (i + 1)}]
+- **Salient Principle:** "${excerpt}"
+- **Classroom Impact:** Provides pre-service educators with direct, evidence-based guidance for structuring learning activities and managing student cognitive demand.`;
+      }).join('\n\n');
     } else {
-      chunksMarkdown = `#### Chunk 1: Foundations of ${keyTerm1}\n- **Principle:** ${sentences[0] || 'Core conceptual orientation extracted from text.'}\n\n#### Chunk 2: Practical Application of ${keyTerm2}\n- **Principle:** ${sentences[1] || 'Instructional procedures and pedagogical strategies.'}`;
+      chunksMarkdown = `#### Chunk 1: Foundations of ${keyTerm1}
+- **Salient Principle:** ${centroidSentences[0]?.sentence || sentences[0]}
+
+#### Chunk 2: Instructional Execution of ${keyTerm2}
+- **Salient Principle:** ${centroidSentences[1]?.sentence || sentences[1]}`;
     }
 
+    // --- Active Recall Cues ---
+    const cueQuestions = [
+      `How does the text define the scope and pedagogical rationale of **${keyTerm1}**?`,
+      `What specific classroom scaffolding is required to successfully implement **${keyTerm2}**?`,
+      `In what ways does **${keyTerm3}** support authentic learner growth and assessment alignment?`
+    ];
+
+    // --- Contrastive Matrix ---
+    let matrixRowA = `| **Primary Orientation** | Emphasizes foundational theoretical grounding | Emphasizes practical procedural execution |`;
+    let matrixRowB = `| **Instructional Dynamic** | Teacher clarifies parameters & baseline schemas | Learners collaborate & execute authentic tasks |`;
+
+    if (contrastMatches.length > 0) {
+      const c = contrastMatches[0];
+      matrixRowA = `| **Differentiating Factor** | ${c.partA} | ${c.partB} |`;
+    }
+
+    // --- Grounded LET Questions ---
+    const def1 = definitionMatches[0];
+    const q1Stem = def1 
+      ? `According to the educational principles in this reading, what is the defining characteristic of **${def1.term}**?`
+      : `In applying the instructional principles outlined in "${cleanTitle}", why must an educator intentionally align learning activities with **${keyTerm1}**?`;
+    
+    const q1Answer = def1 ? def1.definition : `It ensures that cognitive demands align with learner readiness and curricular standards`;
+
     const markdown = `### 1. 🎓 Cornell Synthesis & Active Cues
-- **Macro-Synthesis:** ${macroSynthesis}
+- **Macro-Synthesis [Primary Text Extraction]:** ${macroSynthesis}
 - **Active Recall Cue Questions:**
 ${cueQuestions.map(q => `  - ${q}`).join('\n')}
 
 ---
 
 ### 2. 🧩 Structured Concept Chunks
-*Extracted directly from the ${extractedDoc.totalUnits} ${extractedDoc.unitLabel.toLowerCase()} of **${filename}**:*
+*Extracted via TextRank graph analysis from the ${extractedDoc.totalUnits} ${extractedDoc.unitLabel.toLowerCase()} of **${filename}**:*
 
 ${chunksMarkdown}
 
@@ -445,25 +589,24 @@ ${chunksMarkdown}
 
 | Comparison Dimension | Focus Area: ${keyTerm1} | Focus Area: ${keyTerm2} |
 | :--- | :--- | :--- |
-| **Primary Pedagogical Purpose** | Grounding foundational concepts & schemas | Executing active classroom tasks |
-| **Teacher's Facilitation Role** | Diagnosing baseline misconceptions | Scaffolding practice & guiding reflection |
-| **Learner's Cognitive Activity** | Organizing and internalizing definitions | Applying concepts to solve authentic problems |
-| **Evidence of Success** | Articulating principles clearly | Demonstrating transfer and competence |
+${matrixRowA}
+${matrixRowB}
+| **Evidence of Success** | Articulating principles and identifying schemas | Demonstrating transfer and solving problems |
 
 ---
 
 ### 5. 🎯 Licensure (LET) Retrieval Practice Checkpoint
 
-**Question 1:** In applying the instructional principles outlined in "${cleanTitle}", why must a teacher intentionally align activities with **${keyTerm1}**?
+**Question 1:** ${q1Stem}
 - A) To satisfy administrative compliance without regard for student readiness
-- B) To ensure that cognitive demands align with learner readiness and curricular standards
+- B) ${q1Answer}
 - C) To replace formative evaluation with mechanical memorization
 - D) To eliminate differentiated instruction from lesson planning
 - **Correct Answer:** **B**
-- **Pedagogical Rationalization:** Effective instructional design for ${keyTerm1} requires aligning tasks with students' developmental readiness (Constructivism / Bloom's Taxonomy), preventing extraneous cognitive load and disengagement.
+- **Pedagogical Rationalization:** Effective instructional design requires aligning tasks with students' developmental readiness and evidence-based standards, preventing extraneous cognitive load and fostering authentic competence.
 
 **Question 2:** Which classroom scenario best demonstrates the appropriate pedagogical execution of **${keyTerm2}** as described in the text?
-- A) Teacher facilitates collaborative inquiry and guided problem-solving before summarizing key rules
+- A) Teacher facilitates collaborative inquiry and guided problem-solving before formalizing definitions
 - B) Teacher lectures continuously for 60 minutes without checking for understanding
 - C) Teacher assigns complex homework without modeling or scaffolding
 - D) Teacher relies solely on rote recitation of factual definitions
@@ -479,7 +622,8 @@ ${chunksMarkdown}
 - **Pedagogical Rationalization:** Under DepEd Order No. 8, s. 2015 and modern assessment science, authentic learning is evidenced by transfer and higher-order application rather than mechanical recitation.`;
 
     return {
-      source: 'LOCAL_EXTRACTIVE_NLP',
+      source: 'LOCAL_TEXTRANK_ENGINE',
+      modelName: 'Client-Side TextRank NLP (Offline)',
       markdown,
       analyzedAt: new Date().toISOString()
     };

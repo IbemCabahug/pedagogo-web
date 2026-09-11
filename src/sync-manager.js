@@ -281,6 +281,7 @@ export class SyncManager {
     const planDraft = parseKey('pedagogo_lp_draft', null);
     const letFlags = parseKey('pedagogo_let_flags', []);
     const letLogs = parseKey('pedagogo_let_logs', []);
+    const anecRecords = parseKey('pedagogo_anecdotal_records', []);
     const theme = localStorage.getItem('pedagogo_theme') || 'light';
     const perspective = localStorage.getItem('pedagogo_perspective') || 'STUDENT';
 
@@ -307,6 +308,7 @@ export class SyncManager {
         assessmentScores: assessmentScoreCount,
         letFlags: Array.isArray(letFlags) ? letFlags.length : 0,
         letLogs: Array.isArray(letLogs) ? letLogs.length : 0,
+        anecdotalNotes: Array.isArray(anecRecords) ? anecRecords.length : 0,
         hasLessonPlan: !!savedLp
       },
       stores: {
@@ -318,6 +320,7 @@ export class SyncManager {
         pedagogo_let_cards: flashcards,
         pedagogo_let_flags: letFlags,
         pedagogo_let_logs: letLogs,
+        pedagogo_anecdotal_records: anecRecords,
         pedagogo_fs_entries: fsEntries,
         pedagogo_saved_lp: savedLp,
         pedagogo_reading_history: readingHistory,
@@ -341,6 +344,7 @@ export class SyncManager {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast('Full system backup archive downloaded safely!', 'success');
+    return fullArchive;
   }
 
   /**
@@ -427,6 +431,7 @@ export class SyncManager {
         <span class="inv-pill"><strong>${classesCount}</strong> Classes</span>
         <span class="inv-pill"><strong>${attendanceCount}</strong> Roll Calls</span>
         <span class="inv-pill"><strong>${assessmentCount}</strong> Score Sheets</span>
+        <span class="inv-pill"><strong>${countItems('pedagogo_anecdotal_records')}</strong> Anecdotal Notes</span>
         <span class="inv-pill"><strong>${planLibraryCount}</strong> Lesson Plans</span>
         <span class="inv-pill"><strong>${subjectsCount}</strong> Subjects</span>
       </div>

@@ -14,6 +14,7 @@ import { FieldStudyNotebook } from './field-study-notebook.js';
 import { AttendanceTracker } from './attendance-tracker.js';
 import { AssessmentTracker } from './assessment-tracker.js';
 import { LessonPlanBuilder } from './lesson-plan-builder.js';
+import { AnecdotalRecordTracker } from './anecdotal-record-tracker.js';
 import { showToast } from './toast.js';
 import { showCalmConfirm } from './calm-dialog.js';
 
@@ -35,6 +36,7 @@ class PedagogoDeskApp {
     this.scheduleData = this.loadInitialSchedule();
 
     this.initTheme();
+    this.initSidebar();
     this.initTabs();
     this.initPerspective();
     this.initSpark();
@@ -49,9 +51,16 @@ class PedagogoDeskApp {
     this.documentDesk = new DocumentDesk();
     this.reviewerStudio = new ReviewerStudio();
     this.planBuilder = new LessonPlanBuilder(this.classManager);
+    this.anecdotalTracker = new AnecdotalRecordTracker(this.classManager);
     this.fieldStudyNotebook = new FieldStudyNotebook();
     this.syncManager = new SyncManager((newData) => {
       this.onScheduleUpdated(newData);
+    });
+
+    window.addEventListener('pedagogo:switch-tab', (e) => {
+      if (e.detail?.tab) {
+        this.switchTab(e.detail.tab);
+      }
     });
 
     // Cross-link: import questions from Reading Desk into Reviewer Studio
@@ -135,6 +144,15 @@ class PedagogoDeskApp {
       }
     }
 
+    // 3e. Reload Anecdotal Records Tracker (Future Module C)
+    if (this.anecdotalTracker) {
+      this.anecdotalTracker.entries = this.anecdotalTracker.loadStore();
+      this.anecdotalTracker.selectedClassId = this.classManager?.selectedClassId || this.anecdotalTracker.selectedClassId;
+      if (this.anecdotalTracker.container) {
+        this.anecdotalTracker.render();
+      }
+    }
+
     // 4. Reload Reviewer Studio
     if (this.reviewerStudio) {
       this.reviewerStudio.cards = this.reviewerStudio.loadCards();
@@ -206,6 +224,57 @@ class PedagogoDeskApp {
     }
   }
 
+  initSidebar() {
+    const appLayout = document.getElementById('app');
+    const collapseBtn = document.getElementById('sidebar-collapse-toggle');
+
+    // Default mode is auto-hide icon rail. Pin mode keeps it wide.
+    const isPinned = localStorage.getItem('pedagogo_sidebar_pinned') === 'true';
+    if (isPinned && appLayout) {
+      appLayout.classList.add('sidebar-pinned');
+    }
+    this.updateSidebarToggleUI(isPinned);
+
+    // Toggle button click (pin / auto-hide)
+    if (collapseBtn) {
+      collapseBtn.addEventListener('click', () => {
+        this.toggleSidebar();
+      });
+    }
+
+    // Keyboard shortcut: Ctrl+B to toggle pin state
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        this.toggleSidebar();
+      }
+    });
+  }
+
+  toggleSidebar() {
+    const appLayout = document.getElementById('app');
+    if (!appLayout) return;
+    const isPinned = appLayout.classList.toggle('sidebar-pinned');
+    localStorage.setItem('pedagogo_sidebar_pinned', isPinned ? 'true' : 'false');
+    this.updateSidebarToggleUI(isPinned);
+  }
+
+  updateSidebarToggleUI(isPinned) {
+    const collapseBtn = document.getElementById('sidebar-collapse-toggle');
+    if (!collapseBtn) return;
+    const icon = collapseBtn.querySelector('.collapse-icon');
+    const label = collapseBtn.querySelector('.tab-label');
+    if (isPinned) {
+      if (icon) icon.textContent = '«';
+      if (label) label.textContent = 'Auto-hide Sidebar';
+      collapseBtn.setAttribute('title', 'Switch to auto-hide sidebar (Ctrl+B)');
+    } else {
+      if (icon) icon.textContent = '📌';
+      if (label) label.textContent = 'Pin Sidebar';
+      collapseBtn.setAttribute('title', 'Pin sidebar open (Ctrl+B)');
+    }
+  }
+
   initTabs() {
     const tabs = document.querySelectorAll('.nav-tab');
     tabs.forEach(tab => {
@@ -243,6 +312,14 @@ class PedagogoDeskApp {
     // Refresh lesson plan builder so the library & wizard stay current (Phase 4)
     if (tabKey === 'plan-builder' && this.planBuilder && this.planBuilder.container) {
       this.planBuilder.render();
+    }
+
+    // Refresh anecdotal records journal so it follows the latest roster/section selection (Future Module C)
+    if (tabKey === 'anecdotal' && this.anecdotalTracker) {
+      this.anecdotalTracker.selectedClassId = this.classManager?.selectedClassId || this.anecdotalTracker.selectedClassId;
+      if (this.anecdotalTracker.container) {
+        this.anecdotalTracker.render();
+      }
     }
   }
 

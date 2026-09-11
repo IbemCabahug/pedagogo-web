@@ -18,7 +18,7 @@
     <!-- Top Calm Navigation Bar -->
     <header class="app-header">
       <!-- Tier 1: App Brand, Perspective Switcher & Actions -->
-      <div class="header-top container">
+      <div class="header-top">
         <div class="brand-perspective-cluster">
           <div class="brand-group">
             <div class="brand-icon">🌿</div>
@@ -43,81 +43,107 @@
         </div>
 
         <div class="header-actions">
-          <button class="btn-icon" id="theme-toggle" title="Toggle Calm Theme" aria-label="Toggle Theme">
-            🌓
-          </button>
-          <div class="sync-indicator" id="sync-status-pill">
+          <div class="sync-indicator" id="sync-status-pill" title="Local storage active — records safely preserved on this device">
             <span class="status-dot"></span>
             <span id="sync-status-text">Local Storage</span>
           </div>
+          <button class="btn-icon" id="theme-toggle" title="Toggle Calm Theme" aria-label="Toggle Theme">
+            🌓
+          </button>
         </div>
       </div>
 
-      <!-- Tier 2: Dedicated Navigation Bar -->
-      <div class="header-nav-bar">
-        <div class="header-nav-inner container">
-          <nav class="nav-tabs" aria-label="Main Navigation">
-            <!-- Student Life Tabs -->
-            <button class="nav-tab active" data-tab="today" data-perspective="STUDENT" id="tab-today">
-              <span class="tab-icon">☀️</span>
-              <span>Today's Rhythm</span>
-            </button>
-            <button class="nav-tab" data-tab="tasks" data-perspective="STUDENT" id="tab-tasks">
-              <span class="tab-icon">🎯</span>
-              <span>Tasks &amp; IMs</span>
-            </button>
-            <button class="nav-tab" data-tab="reading-desk" data-perspective="STUDENT" id="tab-reading-desk">
-              <span class="tab-icon">📖</span>
-              <span>Reading Desk</span>
-            </button>
-            <button class="nav-tab" data-tab="reviewer" data-perspective="STUDENT" id="tab-reviewer">
-              <span class="tab-icon">🎯</span>
-              <span>LET Reviewer</span>
-            </button>
-            <button class="nav-tab" data-tab="field-study" data-perspective="STUDENT" id="tab-field-study">
-              <span class="tab-icon">🏫</span>
-              <span>Field Study</span>
-            </button>
-            <button class="nav-tab" data-tab="timetable" data-perspective="STUDENT" id="tab-timetable">
-              <span class="tab-icon">🗓️</span>
-              <span>Weekly Grid</span>
-            </button>
-
-            <!-- Practicum Educator Tabs -->
-            <button class="nav-tab" data-tab="classrooms" data-perspective="EDUCATOR" id="tab-classrooms">
-              <span class="tab-icon">👥</span>
-              <span>Classrooms</span>
-            </button>
-            <button class="nav-tab" data-tab="lesson-studio" data-perspective="EDUCATOR" id="tab-lesson-studio">
-              <span class="tab-icon">📝</span>
-              <span>Lesson Plan Studio</span>
-            </button>
-            <button class="nav-tab" data-tab="practicum" data-perspective="EDUCATOR" id="tab-practicum">
-              <span class="tab-icon">⏱️</span>
-              <span>Practicum &amp; DTR</span>
-            </button>
-            <button class="nav-tab" data-tab="attendance" data-perspective="EDUCATOR" id="tab-attendance">
-              <span class="tab-icon">📋</span>
-              <span>Daily Attendance</span>
-            </button>
-            <button class="nav-tab" data-tab="assessments" data-perspective="EDUCATOR" id="tab-assessments">
-              <span class="tab-icon">📊</span>
-              <span>Scores &amp; Quizzes</span>
-            </button>
-            <button class="nav-tab" data-tab="plan-builder" data-perspective="EDUCATOR" id="tab-plan-builder">
-              <span class="tab-icon">🌱</span>
-              <span>Plan Builder</span>
-            </button>
-
-            <!-- Shared Utility Tab -->
-            <button class="nav-tab" data-tab="sync" data-perspective="ALL" id="tab-sync">
-              <span class="tab-icon">📱</span>
-              <span>Sync with Phone</span>
-            </button>
-          </nav>
-        </div>
-      </div>
     </header>
+
+    <!-- Collapsible Sidebar Navigation -->
+    <aside class="app-sidebar" id="app-sidebar" role="navigation" aria-label="Main Navigation">
+      <nav class="sidebar-nav">
+        <!-- Student Life Groups -->
+        <div class="sidebar-nav-group" data-perspective="STUDENT">
+          <div class="sidebar-group-label">📌 Daily Flow</div>
+          <button class="nav-tab active" data-tab="today" data-perspective="STUDENT" id="tab-today">
+            <span class="tab-icon">☀️</span>
+            <span class="tab-label">Today's Rhythm</span>
+          </button>
+          <button class="nav-tab" data-tab="timetable" data-perspective="STUDENT" id="tab-timetable">
+            <span class="tab-icon">🗓️</span>
+            <span class="tab-label">Weekly Grid</span>
+          </button>
+          <button class="nav-tab" data-tab="tasks" data-perspective="STUDENT" id="tab-tasks">
+            <span class="tab-icon">✏️</span>
+            <span class="tab-label">Tasks &amp; IMs</span>
+          </button>
+        </div>
+
+        <div class="sidebar-nav-group" data-perspective="STUDENT">
+          <div class="sidebar-group-label">📚 Study &amp; Review</div>
+          <button class="nav-tab" data-tab="reading-desk" data-perspective="STUDENT" id="tab-reading-desk">
+            <span class="tab-icon">📖</span>
+            <span class="tab-label">Reading Desk</span>
+          </button>
+          <button class="nav-tab" data-tab="reviewer" data-perspective="STUDENT" id="tab-reviewer">
+            <span class="tab-icon">📝</span>
+            <span class="tab-label">LET Reviewer</span>
+          </button>
+          <button class="nav-tab" data-tab="field-study" data-perspective="STUDENT" id="tab-field-study">
+            <span class="tab-icon">🏫</span>
+            <span class="tab-label">Field Study</span>
+          </button>
+        </div>
+
+        <!-- Practicum Educator Groups -->
+        <div class="sidebar-nav-group" data-perspective="EDUCATOR">
+          <div class="sidebar-group-label">🏫 Classroom</div>
+          <button class="nav-tab" data-tab="classrooms" data-perspective="EDUCATOR" id="tab-classrooms">
+            <span class="tab-icon">👥</span>
+            <span class="tab-label">Classrooms</span>
+          </button>
+          <button class="nav-tab" data-tab="attendance" data-perspective="EDUCATOR" id="tab-attendance">
+            <span class="tab-icon">📋</span>
+            <span class="tab-label">Daily Attendance</span>
+          </button>
+          <button class="nav-tab" data-tab="assessments" data-perspective="EDUCATOR" id="tab-assessments">
+            <span class="tab-icon">📊</span>
+            <span class="tab-label">Scores &amp; Quizzes</span>
+          </button>
+          <button class="nav-tab" data-tab="anecdotal" data-perspective="EDUCATOR" id="tab-anecdotal">
+            <span class="tab-icon">📔</span>
+            <span class="tab-label">Anecdotal Journal</span>
+          </button>
+        </div>
+
+        <div class="sidebar-nav-group" data-perspective="EDUCATOR">
+          <div class="sidebar-group-label">✍️ Lesson Craft</div>
+          <button class="nav-tab" data-tab="lesson-studio" data-perspective="EDUCATOR" id="tab-lesson-studio">
+            <span class="tab-icon">📝</span>
+            <span class="tab-label">Lesson Plan Studio</span>
+          </button>
+          <button class="nav-tab" data-tab="plan-builder" data-perspective="EDUCATOR" id="tab-plan-builder">
+            <span class="tab-icon">🌱</span>
+            <span class="tab-label">Plan Builder</span>
+          </button>
+          <button class="nav-tab" data-tab="practicum" data-perspective="EDUCATOR" id="tab-practicum">
+            <span class="tab-icon">⏱️</span>
+            <span class="tab-label">Practicum &amp; DTR</span>
+          </button>
+        </div>
+
+        <!-- Shared Utility Group (always visible) -->
+        <div class="sidebar-nav-group sidebar-group-utilities" data-perspective="ALL">
+          <div class="sidebar-group-divider"></div>
+          <button class="nav-tab" data-tab="sync" data-perspective="ALL" id="tab-sync">
+            <span class="tab-icon">📱</span>
+            <span class="tab-label">Sync &amp; Backup</span>
+          </button>
+        </div>
+      </nav>
+
+      <!-- Pin / Auto-Hide Sidebar Toggle -->
+      <button class="sidebar-collapse-toggle" id="sidebar-collapse-toggle" title="Pin sidebar open (Ctrl+B)" aria-label="Toggle pin sidebar">
+        <span class="collapse-icon" id="collapse-icon">📌</span>
+        <span class="tab-label">Pin Sidebar</span>
+      </button>
+    </aside>
 
     <!-- Main Content Area -->
     <main class="main-content container">
@@ -869,6 +895,11 @@
       <!-- VIEW 8: Backward-Design Plan Builder — Phase 4 (rendered dynamically via LessonPlanBuilder) -->
       <section class="tab-view" id="view-plan-builder">
         <!-- Injected via LessonPlanBuilder module -->
+      </section>
+
+      <!-- VIEW 9: Anecdotal Records & Observation Journal — Future Module C -->
+      <section class="tab-view" id="view-anecdotal">
+        <!-- Injected via AnecdotalRecordTracker module -->
       </section>
 
       <!-- VIEW 5: Sync with Phone (QR Scan-to-Sync) -->
