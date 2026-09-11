@@ -16,6 +16,9 @@ export class DocumentDesk {
     this.searchQuery = '';
     this.isProcessing = false;
     this.isCornellFolded = false; // "Fold & Test" active recall state
+    this.isSplitView = localStorage.getItem('pedagogo_reader_split_view') === 'true';
+    this.originSubTab = 'synthesis';
+    this.originScrollY = 0;
 
     this.container = document.getElementById('view-reading-desk');
     if (this.container) {
@@ -138,6 +141,9 @@ export class DocumentDesk {
 
         <!-- Actions -->
         <div class="workspace-actions">
+          <button class="btn-subtle btn-toggle-split" id="btn-toggle-split-view" title="Toggle side-by-side view (Notes on left, Original document on right)">
+            <span>${this.isSplitView ? '📖 Single View' : '📑 Split View'}</span>
+          </button>
           ${this.activeSubTab === 'cornell' ? `
             <button class="btn-subtle" id="btn-toggle-fold-notes" title="Cover or reveal notes column for active recall practice">
               ${this.isCornellFolded ? '👁️ <span>Reveal Notes</span>' : '🙈 <span>Fold &amp; Test</span>'}
@@ -157,9 +163,9 @@ export class DocumentDesk {
       </div>
 
       <!-- Main Dual-View Body -->
-      <div class="reading-view-body">
+      <div class="reading-view-body ${this.isSplitView ? 'split-active' : ''}" id="reading-view-body">
         <!-- View A: Pedagogical Synthesis -->
-        <div class="synthesis-panel" id="synthesis-panel" style="${this.activeSubTab === 'synthesis' ? 'display: block;' : 'display: none;'}">
+        <div class="synthesis-panel" id="synthesis-panel" style="${(this.activeSubTab === 'synthesis' || (this.isSplitView && this.activeSubTab !== 'cornell')) ? 'display: block;' : 'display: none;'}">
           <div class="synthesis-meta-strip">
             <span class="synthesis-source-tag">
               🌱 ${analysis?.source === 'GEMINI_API' 
@@ -188,7 +194,10 @@ export class DocumentDesk {
         </div>
 
         <!-- View C: Verbatim Word-for-Word Reader -->
-        <div class="verbatim-panel" id="verbatim-panel" style="${this.activeSubTab === 'verbatim' ? 'display: block;' : 'display: none;'}">
+        <div class="verbatim-panel" id="verbatim-panel" style="${(this.activeSubTab === 'verbatim' || this.isSplitView) ? 'display: block;' : 'display: none;'}">
+          <!-- Jump Return Banner Slot -->
+          <div id="verbatim-jump-banner-slot"></div>
+
           <!-- Search & Unit Filter Toolbar -->
           <div class="verbatim-toolbar">
             <div class="verbatim-search-box">
@@ -501,7 +510,7 @@ export class DocumentDesk {
       const headers = headerRow.split('|').map(h => h.trim()).filter(Boolean);
       const rows = bodyRows.trim().split('\n').map(row => {
         const cells = row.split('|').map(c => c.trim()).filter(Boolean);
-        return `<tr>${cells.map(c => `<td>${c}</td>`).join('')}</tr>`;
+        return `<tr>${cells.map(c => `<td>${this.simpleMarkdown(c)}</td>`).join('')}</tr>`;
       }).join('');
 
       return `
@@ -555,7 +564,23 @@ export class DocumentDesk {
     return text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/\[((?:Page|Slide|Section|Unit)\s+\d+(?::\s*[^\]]+)?|Primary Text Extraction)\]/gi, '<span class="citation-pill">📌 $1</span>')
+      .replace(/\[((?:Page|Slide|Section|Unit)\s+(\d+)(?::\s*([^\]]+))?|Primary Text Extraction)\]/gi, (match, fullText, num, detail) => {
+        if (!num) {
+          return '<span class="citation-pill citation-primary-badge" title="Grounded verbatim from document text">📌 Primary Source</span>';
+        }
+        const unitType = (fullText.match(/^(?:Page|Slide|Section|Unit)/i) || ['Page'])[0];
+        const capitalizedType = unitType.charAt(0).toUpperCase() + unitType.slice(1).toLowerCase();
+        const cleanDetail = detail ? detail.trim() : '';
+        const labelText = `${capitalizedType} ${num}${cleanDetail ? ': ' + cleanDetail : ''}`;
+        const escapedLabel = this.escapeHtml(labelText);
+        const escapedDetail = this.escapeHtml(cleanDetail);
+
+        return `<button type="button" class="citation-pill citation-jump-btn" data-target-unit="${num}" data-unit-type="${capitalizedType}" data-detail="${escapedDetail}" title="Jump to ${capitalizedType} ${num} in source transcript">
+          <span class="citation-pin">📌</span>
+          <span class="citation-text">${escapedLabel}</span>
+          <span class="citation-jump-arrow" aria-hidden="true">↗</span>
+        </button>`;
+      })
       .replace(/^- (.*$)/gim, '<li>$1</li>')
       .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
       .replace(/\n\n/g, '<br><br>');
@@ -701,24 +726,41 @@ export class DocumentDesk {
 
     if (subtabSynthesis) {
       subtabSynthesis.addEventListener('click', () => {
-        this.activeSubTab = 'synthesis';
-        this.render();
+        this.switchSubTab('synthesis');
       });
     }
 
     if (subtabCornell) {
       subtabCornell.addEventListener('click', () => {
-        this.activeSubTab = 'cornell';
-        this.render();
+        this.switchSubTab('cornell');
       });
     }
 
     if (subtabVerbatim) {
       subtabVerbatim.addEventListener('click', () => {
-        this.activeSubTab = 'verbatim';
-        this.render();
+        this.switchSubTab('verbatim');
       });
     }
+
+    const btnToggleSplit = document.getElementById('btn-toggle-split-view');
+    if (btnToggleSplit) {
+      btnToggleSplit.addEventListener('click', () => {
+        this.toggleSplitView();
+      });
+    }
+
+    // Delegated click handler for interactive citation buttons
+    this.container.addEventListener('click', (e) => {
+      const jumpBtn = e.target.closest('.citation-jump-btn');
+      if (jumpBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const targetUnit = parseInt(jumpBtn.dataset.targetUnit, 10);
+        const unitType = jumpBtn.dataset.unitType || 'Page';
+        const detail = jumpBtn.dataset.detail || '';
+        this.jumpToUnit(targetUnit, unitType, detail);
+      }
+    });
 
     // Fold / Unfold active recall toggle
     const handleToggleFold = () => {
@@ -907,22 +949,214 @@ export class DocumentDesk {
     }
   }
 
+  switchSubTab(tabName) {
+    this.activeSubTab = tabName;
+    const synthPanel = document.getElementById('synthesis-panel');
+    const cornellPanel = document.getElementById('cornell-panel');
+    const verbatimPanel = document.getElementById('verbatim-panel');
+
+    if (this.isSplitView) {
+      if (tabName === 'verbatim') {
+        if (verbatimPanel) verbatimPanel.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        if (synthPanel) synthPanel.style.display = tabName === 'synthesis' ? 'block' : 'none';
+        if (cornellPanel) cornellPanel.style.display = tabName === 'cornell' ? 'block' : 'none';
+        if (verbatimPanel) verbatimPanel.style.display = 'block';
+      }
+    } else {
+      if (synthPanel) synthPanel.style.display = tabName === 'synthesis' ? 'block' : 'none';
+      if (cornellPanel) cornellPanel.style.display = tabName === 'cornell' ? 'block' : 'none';
+      if (verbatimPanel) verbatimPanel.style.display = tabName === 'verbatim' ? 'block' : 'none';
+    }
+
+    this.updateSubtabButtons();
+    this.updateWorkspaceActions();
+  }
+
+  updateSubtabButtons() {
+    document.querySelectorAll('.reading-subtab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.subtab === this.activeSubTab);
+    });
+  }
+
+  updateWorkspaceActions() {
+    const foldBtn = document.getElementById('btn-toggle-fold-notes');
+    const exportDocBtn = document.getElementById('btn-export-cornell-doc');
+    const copyBtn = document.getElementById('btn-copy-reading-text');
+
+    if (foldBtn) foldBtn.style.display = this.activeSubTab === 'cornell' ? 'inline-flex' : 'none';
+    if (exportDocBtn) exportDocBtn.style.display = this.activeSubTab === 'cornell' ? 'inline-flex' : 'none';
+    if (copyBtn) copyBtn.style.display = this.activeSubTab !== 'cornell' ? 'inline-flex' : 'none';
+  }
+
+  toggleSplitView() {
+    this.isSplitView = !this.isSplitView;
+    localStorage.setItem('pedagogo_reader_split_view', String(this.isSplitView));
+
+    const body = document.getElementById('reading-view-body');
+    const btn = document.getElementById('btn-toggle-split-view');
+
+    if (body) {
+      body.classList.toggle('split-active', this.isSplitView);
+    }
+
+    if (btn) {
+      btn.innerHTML = `<span>${this.isSplitView ? '📖 Single View' : '📑 Split View'}</span>`;
+    }
+
+    const synthPanel = document.getElementById('synthesis-panel');
+    const cornellPanel = document.getElementById('cornell-panel');
+    const verbatimPanel = document.getElementById('verbatim-panel');
+
+    if (this.isSplitView) {
+      if (this.activeSubTab === 'verbatim') {
+        this.activeSubTab = this.originSubTab || 'synthesis';
+      }
+      if (synthPanel) synthPanel.style.display = this.activeSubTab === 'synthesis' ? 'block' : 'none';
+      if (cornellPanel) cornellPanel.style.display = this.activeSubTab === 'cornell' ? 'block' : 'none';
+      if (verbatimPanel) verbatimPanel.style.display = 'block';
+      showToast('📑 Split View enabled: Notes on left, Document on right', 'info');
+    } else {
+      if (synthPanel) synthPanel.style.display = this.activeSubTab === 'synthesis' ? 'block' : 'none';
+      if (cornellPanel) cornellPanel.style.display = this.activeSubTab === 'cornell' ? 'block' : 'none';
+      if (verbatimPanel) verbatimPanel.style.display = this.activeSubTab === 'verbatim' ? 'block' : 'none';
+      showToast('📖 Single View enabled', 'info');
+    }
+
+    this.updateSubtabButtons();
+    this.updateWorkspaceActions();
+  }
+
+  jumpToUnit(unitNum, unitType = 'Page', detail = '') {
+    if (!this.currentDoc) return;
+
+    if (this.isSplitView) {
+      this.ensureUnitCardVisible(unitNum);
+      const unitCard = document.getElementById(`unit-card-${unitNum}`);
+      if (unitCard) {
+        unitCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        this.pulseUnitCard(unitCard, detail);
+      }
+      showToast(`📍 Scrolled to ${unitType} ${unitNum} in preview panel`, 'info');
+      return;
+    }
+
+    // In Single View, remember origin
+    this.originSubTab = this.activeSubTab;
+    this.originScrollY = window.scrollY;
+
+    // Switch to verbatim
+    this.switchSubTab('verbatim');
+    this.ensureUnitCardVisible(unitNum);
+
+    // Mount return banner
+    this.showReturnBanner(unitNum, unitType);
+
+    // Scroll to target
+    setTimeout(() => {
+      const targetCard = document.getElementById(`unit-card-${unitNum}`);
+      if (targetCard) {
+        targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        this.pulseUnitCard(targetCard, detail);
+      }
+    }, 60);
+
+    showToast(`📍 Jumped to ${unitType} ${unitNum}. Click "Return" when finished.`, 'info');
+  }
+
+  ensureUnitCardVisible(unitNum) {
+    const targetCard = document.getElementById(`unit-card-${unitNum}`);
+    if (targetCard && targetCard.style.display === 'none') {
+      document.querySelectorAll('.verbatim-unit-card').forEach(c => {
+        c.style.display = 'block';
+      });
+      document.querySelectorAll('.unit-jump-pill').forEach(p => {
+        p.classList.toggle('active', p.dataset.unit === 'all');
+      });
+    }
+  }
+
+  pulseUnitCard(card, detail = '') {
+    card.classList.remove('citation-target-pulse');
+    void card.offsetWidth; // force CSS reflow
+    card.classList.add('citation-target-pulse');
+  }
+
+  showReturnBanner(unitNum, unitType) {
+    const slot = document.getElementById('verbatim-jump-banner-slot');
+    if (!slot) return;
+
+    const returnLabel = this.originSubTab === 'cornell' ? '📝 Cornell Study Sheet' : '💡 Pedagogical Synthesis';
+
+    slot.innerHTML = `
+      <div class="verbatim-return-banner" id="verbatim-return-banner">
+        <div class="return-banner-info">
+          <span class="return-badge">📌 Viewing ${this.escapeHtml(unitType)} ${unitNum}</span>
+          <span class="return-hint">Grounded verbatim text cited in your study notes</span>
+        </div>
+        <button class="btn-primary btn-return-from-jump" id="btn-return-from-jump" title="Return to where you were reading">
+          ← Return to ${returnLabel}
+        </button>
+      </div>
+    `;
+
+    const btnReturn = document.getElementById('btn-return-from-jump');
+    if (btnReturn) {
+      btnReturn.addEventListener('click', () => {
+        this.switchSubTab(this.originSubTab);
+        window.scrollTo({ top: this.originScrollY, behavior: 'smooth' });
+        slot.innerHTML = '';
+        showToast('Returned to your study notes 🌿', 'info');
+      });
+    }
+  }
+
   loadSample(sample) {
+    let units = [];
+    if (sample.rawText && sample.rawText.includes('--- [')) {
+      const parts = sample.rawText.split(/--- \[Page (\d+) of \d+\] ---\n?/);
+      for (let i = 1; i < parts.length; i += 2) {
+        const pageNum = parseInt(parts[i], 10);
+        const pageText = (parts[i + 1] || '').trim();
+        units.push({
+          unitNumber: pageNum,
+          title: `Page ${pageNum}`,
+          text: pageText
+        });
+      }
+    }
+    if (units.length === 0) {
+      units = [
+        {
+          unitNumber: 1,
+          title: 'Page 1',
+          text: 'Module 3: Child and Adolescent Development\nCognitive Development Foundations: Jean Piaget and Lev Vygotsky\n\nIntroduction:\nPre-service teachers must understand how human cognition unfolds in order to design developmentally appropriate instruction. Two foundational theorists dominate modern pedagogical discourse: Jean Piaget (1896–1980) and Lev Vygotsky (1896–1934). While both reject behaviorist transmission models and view learners as active meaning-makers (constructivists), they diverge profoundly on the origin, mechanism, and trajectory of cognitive growth.'
+        },
+        {
+          unitNumber: 2,
+          title: 'Page 2',
+          text: 'Jean Piaget: Cognitive Constructivism & Stages\nPiaget proposed that cognitive development originates from within the individual through autonomous physical and mental manipulation of the environment. Knowledge is organized into cognitive structures known as schemas. When a child encounters new stimuli, they experience cognitive disequilibrium. To restore equilibrium, the learner either assimilates the information into an existing schema or accommodates by modifying the schema. Piaget asserted that development precedes learning across four stages:\n1. Sensorimotor (0–2 years): Object permanence.\n2. Preoperational (2–7 years): Egocentrism, symbolic play, lack of conservation.\n3. Concrete Operational (7–11 years): Conservation, reversibility, classification.\n4. Formal Operational (11+ years): Abstract reasoning, hypothetical-deductive logic.'
+        },
+        {
+          unitNumber: 3,
+          title: 'Page 3',
+          text: 'Lev Vygotsky: Socio-Cultural Theory & The ZPD\nIn contrast, Lev Semionovich Vygotsky posited that cognitive development originates externally through social interaction and cultural tools, particularly language. Vygotsky rejected universal biological stages, arguing instead that learning precedes development. Children internalize interpersonal dialogues into intrapersonal inner speech, which subsequently directs thought.\nCentral to Vygotsky\'s pedagogy is the Zone of Proximal Development (ZPD): the distance between a learner\'s actual development level and their potential development level under guidance or with more capable peers (MKO). Jerome Bruner later operationalized this through Scaffolding: temporary, calibrated pedagogical support gradually dismantled as the learner achieves autonomy.'
+        }
+      ];
+    }
+
     this.currentDoc = {
       filename: sample.title + '.' + sample.fileType.toLowerCase(),
       fileType: sample.fileType,
-      totalUnits: sample.totalUnits,
-      unitLabel: sample.unitLabel,
+      totalUnits: sample.totalUnits || units.length,
+      unitLabel: sample.unitLabel || 'Pages',
       rawText: sample.rawText,
-      units: [
-        { unitNumber: 1, title: 'Page 1', text: 'Module 3: Child and Adolescent Development\nCognitive Development Foundations: Jean Piaget and Lev Vygotsky' },
-        { unitNumber: 2, title: 'Page 2', text: 'Jean Piaget: Cognitive Constructivism & Stages\nPiaget proposed that cognitive development originates from within the individual through autonomous physical and mental manipulation of the environment...' },
-        { unitNumber: 3, title: 'Page 3', text: 'Lev Vygotsky: Socio-Cultural Theory & The ZPD\nIn contrast, Lev Semionovich Vygotsky posited that cognitive development originates externally through social interaction and cultural tools, particularly language...' }
-      ]
+      units: units
     };
 
     this.currentAnalysis = {
       source: 'LOCAL_PEDAGOGICAL_ENGINE',
+      modelName: 'Built-in Educational Benchmark',
       markdown: sample.synthesis,
       analyzedAt: new Date().toISOString()
     };
