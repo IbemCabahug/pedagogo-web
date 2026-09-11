@@ -82,6 +82,11 @@ export class DocumentParser {
         fullText += `\n\n--- [Page ${i} of ${numPages}] ---\n\n` + trimmedPage;
       }
 
+      const strippedContent = fullText.replace(/--- \[Page \d+ of \d+\] ---/g, '').trim();
+      if (!strippedContent || strippedContent.length < 5) {
+        throw new Error(`No readable digital text could be extracted from "${filename}". This PDF appears to be a scanned image, photocopy, or protected document without selectable text. Please upload a PDF with selectable text, a Word (.docx) file, or plain text.`);
+      }
+
       return {
         filename,
         fileType: 'PDF',
@@ -92,7 +97,7 @@ export class DocumentParser {
       };
     } catch (err) {
       console.error('PDF parsing error:', err);
-      throw new Error(`Could not parse PDF: ${err.message}`);
+      throw err;
     }
   }
 

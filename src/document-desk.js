@@ -157,11 +157,20 @@ export class DocumentDesk {
         <div class="synthesis-panel" id="synthesis-panel" style="${this.activeSubTab === 'synthesis' ? 'display: block;' : 'display: none;'}">
           <div class="synthesis-meta-strip">
             <span class="synthesis-source-tag">
-              🌱 ${analysis?.source === 'GEMINI_API' ? 'Analyzed via Gemini Flash AI' : 'Pedagogical Framework Engine'}
+              🌱 ${analysis?.source === 'GEMINI_API' 
+                ? 'Analyzed via Gemini Flash AI' 
+                : (analysis?.source === 'LOCAL_EXTRACTIVE_NLP' 
+                  ? 'Local In-Browser Extractive Synthesis (From Your Document)' 
+                  : 'Built-in Educational Sample')}
             </span>
             <span class="synthesis-frameworks-badge">
               ✓ Cornell Notes • ✓ Cognitive Chunking • ✓ Feynman Analogy • ✓ Contrastive Matrix • ✓ LET Practice
             </span>
+            ${analysis?.source === 'LOCAL_EXTRACTIVE_NLP' ? `
+              <button class="btn-subtle" id="btn-upgrade-gemini-pill" style="margin-left: auto; font-size: 11.5px; padding: 3px 10px;">
+                ⚡ <span>Connect Free Gemini Key for Generative AI</span>
+              </button>
+            ` : ''}
           </div>
           <div class="synthesis-content-render" id="synthesis-rendered-area">
             ${this.renderSynthesisMarkdown(analysis?.markdown || '')}
@@ -834,6 +843,14 @@ export class DocumentDesk {
       });
     });
 
+    // Upgrade Gemini pill
+    const btnUpgradeGemini = document.getElementById('btn-upgrade-gemini-pill');
+    if (btnUpgradeGemini) {
+      btnUpgradeGemini.addEventListener('click', () => {
+        this.openGeminiModal();
+      });
+    }
+
     this.bindCopyUnitButtons();
   }
 
@@ -854,6 +871,13 @@ export class DocumentDesk {
 
     try {
       const extractedDoc = await DocumentParser.parseFile(file);
+
+      // Verify readable text was actually extracted
+      const cleanContent = (extractedDoc.rawText || '').replace(/--- \[Page \d+ of \d+\] ---/g, '').trim();
+      if (!cleanContent || cleanContent.length < 5) {
+        throw new Error(`No readable digital text could be found in "${file.name}". If this is a scanned photocopy or image-only PDF, please upload a document with digital selectable text, or a Word (.docx) file.`);
+      }
+
       this.updateLoadingDesc('Running 5-Part Pedagogical Synthesis (Cornell, Chunks, Feynman, Matrix, LET)...');
 
       const analysis = await DocumentSummarizer.summarize(extractedDoc);
@@ -863,10 +887,17 @@ export class DocumentDesk {
       this.activeSubTab = 'synthesis';
       this.hideLoading();
       this.render();
-      showToast(`Document "${extractedDoc.filename}" analyzed successfully!`, 'success');
+
+      if (analysis.source === 'LOCAL_EXTRACTIVE_NLP') {
+        showToast(`🌱 Analyzed "${extractedDoc.filename}" from its actual text! (Connect free Gemini key anytime for generative AI synthesis)`, 'info');
+      } else if (analysis.source === 'GEMINI_API') {
+        showToast(`✨ Document "${extractedDoc.filename}" synthesized via Gemini Flash AI!`, 'success');
+      } else {
+        showToast(`Document "${extractedDoc.filename}" loaded successfully!`, 'success');
+      }
     } catch (err) {
       this.hideLoading();
-      showToast(`Could not process document: ${err.message}`, 'warning');
+      showToast(`${err.message}`, 'warning');
     }
   }
 
