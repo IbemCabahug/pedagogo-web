@@ -6097,3 +6097,241 @@ body.dark-mode .inventory-status {
 }
 
 
+/* =========================================================
+   📊 Assessment & Quiz Tracker (Phase 3 — ECR Foundation)
+   Reuses the attendance tracker's calm card system; adds
+   score-entry ergonomics. Zero punitive red anywhere.
+   ========================================================= */
+
+.asm-launcher-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1.3fr 0.8fr 0.9fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.asm-title-input {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color, #E4E0D5);
+  border-radius: 10px;
+  background: var(--surface-subtle, #F5F2E9);
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--text-main);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.asm-title-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(59, 99, 71, 0.12);
+}
+
+.asm-score-input {
+  width: 90px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color, #E4E0D5);
+  border-radius: 10px;
+  background: #FFF;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+  text-align: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.asm-score-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(59, 99, 71, 0.12);
+}
+
+.asm-score-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Hide number spinners — a calm number pad instead of a spinner jungle */
+.asm-score-input::-webkit-outer-spin-button,
+.asm-score-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.asm-score-input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.asm-max-hint {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.asm-history-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 2px 0 6px;
+}
+
+/* 🖨️ Class Record print sheet (mirror of the SF2 print pattern) */
+
+.asm-print-document {
+  font-family: 'Times New Roman', Times, serif;
+  color: #111 !important;
+  line-height: 1.4;
+}
+
+.asm-print-document .print-header {
+  text-align: center;
+  border-bottom: 2px solid #000;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.asm-print-document .print-header h2 {
+  font-size: 17px;
+  margin: 4px 0;
+}
+
+.asm-print-document .print-header h3 {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.asm-print-document .course-subtitle {
+  font-size: 12px;
+  font-style: italic;
+}
+
+.asm-print-document table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+}
+
+.asm-print-document th,
+.asm-print-document td {
+  border: 1px solid #000;
+  padding: 5px 8px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.asm-print-document th {
+  background: #EEE !important;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+}
+
+@media print {
+  body.printing-asm-sheet {
+    background: #FFF !important;
+    color: #000 !important;
+  }
+
+  body.printing-asm-sheet .main-content,
+  body.printing-asm-sheet .app-header,
+  body.printing-asm-sheet .spark-banner,
+  body.printing-asm-sheet .app-footer,
+  body.printing-asm-sheet .modal-backdrop,
+  body.printing-asm-sheet .pedagogo-toast-container {
+    display: none !important;
+  }
+
+  body.printing-asm-sheet #asm-print-sheet {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 24px;
+    background: #FFF !important;
+    color: #000 !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .asm-launcher-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Plan Builder (Phase 4 wizard) */
+.lpb-library { margin: 12px 0 16px; }
+.lpb-library-header { display: flex; justify-content: space-between; }
+.lpb-library-header span:first-child { font-weight: 800; font-size: 13px; }
+.lpb-library-sub { font-size: 11.5px; color: var(--text-muted); }
+.lpb-library-empty { padding: 14px 16px; border: 1px dashed var(--border-color, #E4E0D5); border-radius: 12px; font-size: 13px; color: var(--text-muted); background: var(--surface-subtle, #F5F2E9); }
+.lpb-library-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 10px; }
+.lpb-library-card { border: 1px solid var(--border-color, #E4E0D5); border-radius: 12px; padding: 10px 12px; background: var(--surface-white, #FFF); }
+.lpb-library-card.active { border-color: var(--sage-primary, #3B6347); box-shadow: 0 0 0 2px rgba(59,99,71,.14); }
+.lpb-card-badge { font-size: 11px; font-weight: 800; color: var(--text-muted); }
+.lpb-card-title { font-weight: 800; font-size: 13.5px; margin: 2px 0; }
+.lpb-card-meta { font-size: 11.5px; color: var(--text-muted); }
+.lpb-card-actions { display: flex; gap: 6px; margin-top: 8px; }
+.lpb-card-btn { border: 1px solid var(--border-color, #E4E0D5); background: var(--surface-subtle, #F5F2E9); border-radius: 8px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.lpb-rail { display: flex; align-items: center; gap: 8px; margin: 14px 0 6px; flex-wrap: wrap; }
+.lpb-rail-step { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border-color, #E4E0D5); background: var(--surface-white, #FFF); border-radius: 999px; padding: 6px 14px; cursor: pointer; font-size: 13px; }
+.lpb-rail-step.active { border-color: var(--step-color, #3B6347); font-weight: 800; }
+.lpb-rail-connector { color: var(--text-muted); }
+.lpb-stage-hint { font-size: 12.5px; color: var(--text-muted); margin: 6px 0 10px; }
+.lpb-harmony { display: flex; gap: 10px; align-items: center; background: #EFF5EE; border: 1px solid #D6E9D8; border-radius: 12px; padding: 10px 14px; font-size: 13px; }
+.lpb-alignment-card { background: #FFFBEE; border: 1px solid #F0DFB5; border-radius: 12px; padding: 10px 14px; }
+.lpb-alignment-title { font-weight: 800; font-size: 13px; margin-bottom: 6px; }
+.lpb-alignment-sub { font-weight: 400; color: var(--text-muted); font-size: 11.5px; }
+.lpb-nudge { display: flex; gap: 8px; font-size: 12.5px; margin-top: 4px; }
+.lpb-stage { background: var(--surface-white, #FFF); border: 1px solid var(--border-color, #E4E0D5); border-radius: 14px; padding: 14px; }
+.lpb-meta-card { border: 1px solid var(--border-color, #E4E0D5); border-radius: 12px; padding: 12px; margin-bottom: 12px; background: var(--surface-subtle, #F7F3E9); }
+.lpb-meta-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.lpb-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.lpb-field-grow { grid-column: span 2; }
+.lpb-field label { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; color: var(--text-muted); }
+.lpb-field input, .lpb-field select, .lpb-field textarea, .lpb-stage textarea, .lpb-stage select { border: 1px solid var(--border-color, #E4E0D5); border-radius: 10px; padding: 9px 12px; font-family: inherit; font-size: 13.5px; background: #FFF; color: var(--text-main); width: 100%; box-sizing: border-box; }
+.lpb-hint-inline { font-weight: 400; text-transform: none; }
+.lpb-bloom-title { font-weight: 800; font-size: 13px; margin-bottom: 8px; }
+.lpb-bloom-levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.lpb-bloom-level { border: 1px solid var(--border-color, #E4E0D5); border-left: 4px solid var(--bloom-color, #3B6347); border-radius: 12px; padding: 10px 12px; background: #FFF; }
+.lpb-bloom-head { font-weight: 800; font-size: 12.5px; margin-bottom: 6px; }
+.lpb-verb-cloud { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.lpb-verb-chip { border: 1px solid var(--border-color, #E4E0D5); background: var(--surface-subtle, #F5F2E9); border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.lpb-bloom-radio { font-size: 12px; color: var(--text-muted); display: flex; gap: 6px; align-items: center; }
+.lpb-evidence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.lpb-evidence-card { border: 1px solid var(--border-color, #E4E0D5); border-radius: 12px; padding: 12px; background: #FFF; }
+.lpb-evidence-title { font-weight: 800; font-size: 13px; margin-bottom: 8px; }
+.lpb-time-strip { font-size: 12.5px; color: var(--text-muted); background: var(--surface-subtle, #F5F2E9); border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; }
+.lpb-parts { display: grid; gap: 10px; margin-bottom: 10px; }
+.lpb-part-card { border: 1px solid var(--border-color, #E4E0D5); border-radius: 12px; padding: 10px 12px; background: #FFF; }
+.lpb-part-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+.lpb-part-step { font-weight: 800; font-size: 13px; }
+.lpb-part-tools { display: flex; gap: 6px; }
+.lpb-min-input { width: 70px !important; }
+.lpb-ppst-select { min-width: 170px; }
+.lpb-part-hint { font-size: 11.5px; color: var(--text-muted); margin-bottom: 6px; }
+.lpb-export-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.lpb-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; gap: 10px; }
+.lpb-nav-progress { font-size: 12px; color: var(--text-muted); }
+.framework-toggle { display: flex; gap: 6px; }
+.framework-btn { border: 1px solid var(--border-color, #E4E0D5); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; background: var(--surface-subtle, #F5F2E9); }
+.framework-btn.active { background: var(--sage-primary, #3B6347); color: #FFF; border-color: var(--sage-primary, #3B6347); }
+.lpb-print-document { font-family: 'Times New Roman', Times, serif; color: #111 !important; line-height: 1.4; }
+.lpb-print-document .print-header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 16px; }
+.lpb-print-document table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.lpb-print-document th, .lpb-print-document td { border: 1px solid #000; padding: 5px 8px; font-size: 12px; text-align: left; }
+.lpb-print-document th { background: #EEE !important; text-transform: uppercase; font-size: 10.5px; }
+.lpb-print-sec { margin-top: 12px; }
+.lpb-print-sec h4 { font-size: 13px; margin-bottom: 6px; }
+@media print {
+  body.printing-lpb-sheet { background: #FFF !important; color: #000 !important; }
+  body.printing-lpb-sheet .main-content, body.printing-lpb-sheet .app-header { display: none !important; }
+  body.printing-lpb-sheet #lpb-print-sheet { display: block !important; position: absolute; top: 0; left: 0; width: 100%; padding: 24px; background: #FFF !important; }
+}
+@media (max-width: 900px) { .lpb-evidence-grid { grid-template-columns: 1fr; } .lpb-field-grow { grid-column: span 1; } }
+

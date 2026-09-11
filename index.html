@@ -100,6 +100,14 @@
               <span class="tab-icon">📋</span>
               <span>Daily Attendance</span>
             </button>
+            <button class="nav-tab" data-tab="assessments" data-perspective="EDUCATOR" id="tab-assessments">
+              <span class="tab-icon">📊</span>
+              <span>Scores &amp; Quizzes</span>
+            </button>
+            <button class="nav-tab" data-tab="plan-builder" data-perspective="EDUCATOR" id="tab-plan-builder">
+              <span class="tab-icon">🌱</span>
+              <span>Plan Builder</span>
+            </button>
 
             <!-- Shared Utility Tab -->
             <button class="nav-tab" data-tab="sync" data-perspective="ALL" id="tab-sync">
@@ -851,6 +859,16 @@
       <!-- VIEW 6: DepEd SF2 Daily Attendance Tracker (rendered dynamically via AttendanceTracker) -->
       <section class="tab-view" id="view-attendance">
         <!-- Injected via AttendanceTracker module -->
+      </section>
+
+      <!-- VIEW 7: Assessment & Quiz Tracker — Phase 3 (rendered dynamically via AssessmentTracker) -->
+      <section class="tab-view" id="view-assessments">
+        <!-- Injected via AssessmentTracker module -->
+      </section>
+
+      <!-- VIEW 8: Backward-Design Plan Builder — Phase 4 (rendered dynamically via LessonPlanBuilder) -->
+      <section class="tab-view" id="view-plan-builder">
+        <!-- Injected via LessonPlanBuilder module -->
       </section>
 
       <!-- VIEW 5: Sync with Phone (QR Scan-to-Sync) -->

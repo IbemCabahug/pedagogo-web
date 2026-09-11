@@ -254,7 +254,8 @@ export class SyncManager {
 
   /**
    * Generates a single, comprehensive .json archive of all local storage modules
-   * (schedule, tasks, classrooms, rosters, LET cards, FS logs, lesson plans, reading history, and SF2 attendance roll calls).
+   * (schedule, tasks, classrooms, rosters, LET cards, FS logs, lesson plans, reading history,
+   *  SF2 attendance roll calls, and Phase 3 assessment score sheets).
    */
   exportFullBackup() {
     const parseKey = (key, fallback) => {
@@ -273,11 +274,16 @@ export class SyncManager {
     const savedLp = parseKey('pedagogo_saved_lp', null);
     const readingHistory = parseKey('pedagogo_reading_history', []);
     const attendance = parseKey('pedagogo_attendance_sessions', null);
+    const assessments = parseKey('pedagogo_assessments', null);
+    const planLibrary = parseKey('pedagogo_lp_plans', null);
+    const planDraft = parseKey('pedagogo_lp_draft', null);
     const theme = localStorage.getItem('pedagogo_theme') || 'light';
     const perspective = localStorage.getItem('pedagogo_perspective') || 'STUDENT';
 
     const attendanceSessionCount = attendance && Array.isArray(attendance.sessions) ? attendance.sessions.length : 0;
     const attendanceEntryCount = attendance && Array.isArray(attendance.entries) ? attendance.entries.length : 0;
+    const assessmentCount = assessments && Array.isArray(assessments.assessments) ? assessments.assessments.length : 0;
+    const assessmentScoreCount = assessments && Array.isArray(assessments.scores) ? assessments.scores.length : 0;
 
     const fullArchive = {
       app: 'Pedagogo Desk',
@@ -293,6 +299,8 @@ export class SyncManager {
         fieldStudyEntries: Array.isArray(fsEntries) ? fsEntries.length : 0,
         attendanceSessions: attendanceSessionCount,
         attendanceEntries: attendanceEntryCount,
+        assessments: assessmentCount,
+        assessmentScores: assessmentScoreCount,
         hasLessonPlan: !!savedLp
       },
       stores: {
@@ -306,6 +314,9 @@ export class SyncManager {
         pedagogo_saved_lp: savedLp,
         pedagogo_reading_history: readingHistory,
         pedagogo_attendance_sessions: attendance,
+        pedagogo_assessments: assessments,
+        pedagogo_lp_plans: planLibrary,
+        pedagogo_lp_draft: planDraft,
         pedagogo_theme: theme,
         pedagogo_perspective: perspective
       }
@@ -376,6 +387,24 @@ export class SyncManager {
       attendanceCount = 0;
     }
 
+    let assessmentCount = 0;
+    try {
+      const asmRaw = localStorage.getItem('pedagogo_assessments');
+      const asm = asmRaw ? JSON.parse(asmRaw) : null;
+      assessmentCount = asm && Array.isArray(asm.assessments) ? asm.assessments.length : 0;
+    } catch {
+      assessmentCount = 0;
+    }
+
+    let planLibraryCount = 0;
+    try {
+      const plRaw = localStorage.getItem('pedagogo_lp_plans');
+      const pl = plRaw ? JSON.parse(plRaw) : null;
+      planLibraryCount = pl && Array.isArray(pl.plans) ? pl.plans.length : 0;
+    } catch {
+      planLibraryCount = 0;
+    }
+
     this.inventoryStrip.innerHTML = `
       <div class="inventory-header">
         <span>📦 Current In-Browser Data Inventory</span>
@@ -387,6 +416,8 @@ export class SyncManager {
         <span class="inv-pill"><strong>${tasksCount}</strong> Tasks &amp; IMs</span>
         <span class="inv-pill"><strong>${classesCount}</strong> Classes</span>
         <span class="inv-pill"><strong>${attendanceCount}</strong> Roll Calls</span>
+        <span class="inv-pill"><strong>${assessmentCount}</strong> Score Sheets</span>
+        <span class="inv-pill"><strong>${planLibraryCount}</strong> Lesson Plans</span>
         <span class="inv-pill"><strong>${subjectsCount}</strong> Subjects</span>
       </div>
     `;

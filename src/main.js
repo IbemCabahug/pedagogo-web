@@ -12,6 +12,8 @@ import { DocumentDesk } from './document-desk.js';
 import { ReviewerStudio } from './reviewer-studio.js';
 import { FieldStudyNotebook } from './field-study-notebook.js';
 import { AttendanceTracker } from './attendance-tracker.js';
+import { AssessmentTracker } from './assessment-tracker.js';
+import { LessonPlanBuilder } from './lesson-plan-builder.js';
 import { showToast } from './toast.js';
 
 class PedagogoDeskApp {
@@ -41,9 +43,11 @@ class PedagogoDeskApp {
     this.lessonPlanStudio = new LessonPlanStudio();
     this.classManager = new ClassManager();
     this.attendanceTracker = new AttendanceTracker(this.classManager);
+    this.assessmentTracker = new AssessmentTracker(this.classManager);
     this.taskStudio = new TaskStudio();
     this.documentDesk = new DocumentDesk();
     this.reviewerStudio = new ReviewerStudio();
+    this.planBuilder = new LessonPlanBuilder(this.classManager);
     this.fieldStudyNotebook = new FieldStudyNotebook();
     this.syncManager = new SyncManager((newData) => {
       this.onScheduleUpdated(newData);
@@ -103,6 +107,30 @@ class PedagogoDeskApp {
       this.attendanceTracker.activeSessionId = this.attendanceTracker.getSessionsForClass(this.attendanceTracker.selectedClassId)[0]?.id || null;
       if (this.attendanceTracker.container) {
         this.attendanceTracker.render();
+      }
+    }
+
+    // 3c. Reload Assessment & Quiz Tracker (Phase 3 score sheets)
+    if (this.assessmentTracker) {
+      this.assessmentTracker.store = this.assessmentTracker.loadStore();
+      this.assessmentTracker.selectedClassId = this.classManager?.selectedClassId || this.assessmentTracker.selectedClassId;
+      this.assessmentTracker.activeAssessmentId = this.assessmentTracker.getAssessmentsForClass(this.assessmentTracker.selectedClassId)[0]?.id || null;
+      if (this.assessmentTracker.container) {
+        this.assessmentTracker.render();
+      }
+    }
+
+    // 3d. Reload Lesson Plan Builder library (Phase 4 backward-design plans)
+    if (this.planBuilder) {
+      this.planBuilder.classManager = this.classManager;
+      this.planBuilder.store = this.planBuilder.loadStore();
+      this.planBuilder.draft = this.planBuilder.loadDraft();
+      this.planBuilder.container = document.getElementById('view-plan-builder') || this.planBuilder.container;
+      const stillThere = this.planBuilder.store.plans.find(p => p.id === this.planBuilder.activePlanId);
+      this.planBuilder.activePlanId = stillThere ? this.planBuilder.activePlanId : (this.planBuilder.store.plans[0]?.id || null);
+      if (this.planBuilder.container) {
+        this.planBuilder.bindEvents();
+        this.planBuilder.render();
       }
     }
 
@@ -199,6 +227,19 @@ class PedagogoDeskApp {
       if (this.attendanceTracker.container) {
         this.attendanceTracker.render();
       }
+    }
+
+    // Refresh assessment view so it follows the latest roster/section selection
+    if (tabKey === 'assessments' && this.assessmentTracker) {
+      this.assessmentTracker.selectedClassId = this.classManager?.selectedClassId || this.assessmentTracker.selectedClassId;
+      if (this.assessmentTracker.container) {
+        this.assessmentTracker.render();
+      }
+    }
+
+    // Refresh lesson plan builder so the library & wizard stay current (Phase 4)
+    if (tabKey === 'plan-builder' && this.planBuilder && this.planBuilder.container) {
+      this.planBuilder.render();
     }
   }
 
