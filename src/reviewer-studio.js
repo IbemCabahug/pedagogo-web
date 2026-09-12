@@ -877,7 +877,7 @@ export class ReviewerStudio {
               <h4 class="card-front-preview">${this.escapeHtml(card.front)}</h4>
               <p class="card-back-preview">${this.escapeHtml(card.back)}</p>
               <div class="card-footer-line">
-                <span class="card-type-chip">${card.type === 'SCENARIO_MCQ' ? '📝 Board MCQ' : '🎴 Flashcard'}</span>
+                <span class="card-type-chip">${card.type === 'SCENARIO_MCQ' ? '📝 Board MCQ' : card.type === 'TERM_FILL_IN' ? '🔤 Term Drill' : '🎴 Flashcard'}</span>
                 <span class="due-status-chip ${isCardDue ? 'is-due' : 'is-scheduled'}">
                   ${isCardDue ? '🌿 Due today' : 'Scheduled in Box ' + card.box}
                 </span>
@@ -951,7 +951,7 @@ export class ReviewerStudio {
         <div class="drill-main-card ${this.dailyDrillRevealed ? 'revealed' : ''}">
           <div class="drill-card-top">
             <span class="drill-ppst-tag">${this.escapeHtml(card.ppstStrand || 'Pedagogical Knowledge')}</span>
-            <span class="card-type-pill">${card.type === 'SCENARIO_MCQ' ? '📝 PRC Scenario MCQ' : '🎴 Key Concept Flashcard'}</span>
+            <span class="card-type-pill">${card.type === 'SCENARIO_MCQ' ? '📝 PRC Scenario MCQ' : card.type === 'TERM_FILL_IN' ? '🔤 Term Fill-in Drill' : '🎴 Key Concept Flashcard'}</span>
           </div>
 
           <!-- Question Prompt -->
@@ -2593,18 +2593,25 @@ export class ReviewerStudio {
     if (!Array.isArray(questionsArray) || questionsArray.length === 0) return;
 
     let importedCount = 0;
+    let termCount = 0;
     const now = Date.now();
     questionsArray.forEach((q, idx) => {
+      const isTermDrill = q.cardKind === 'TERM_FILL_IN' || ((q.options || []).length === 0 && (q.answer || '').length > 0 && (q.answer || '').length < 60);
+      if (isTermDrill) termCount += 1;
       const card = {
         id: 'import-' + now + '-' + idx,
-        type: 'SCENARIO_MCQ',
+        type: isTermDrill ? 'TERM_FILL_IN' : 'SCENARIO_MCQ',
         category: 'PROFED',
         competency: docTitle,
         ppstStrand: 'Domain 1: Content Knowledge and Pedagogy',
-        front: q.question || q.front || 'Review Item',
-        back: q.rationalization || q.explanation || q.answer || 'Refer to curriculum synthesis',
+        front: q.front || q.question || 'Review Item',
+        back: isTermDrill
+          ? `${q.answer || 'See Term Bank'}${q.rationalization ? ' — ' + q.rationalization : ''}`
+          : (q.rationalization || q.explanation || q.answer || 'Refer to curriculum synthesis'),
         options: q.options || (q.choices ? q.choices.map((c, i) => `${String.fromCharCode(65 + i)}) ${c}`) : []),
-        correctAnswer: (q.correctAnswer || q.answer || 'A').trim().toUpperCase(),
+        correctAnswer: isTermDrill
+          ? (q.answer || q.correctAnswer || '').trim()
+          : (q.correctAnswer || q.answer || 'A').trim().toUpperCase(),
         rationalization: q.rationalization || q.explanation || '',
         box: 1,
         reviewCount: 0,
@@ -2614,9 +2621,13 @@ export class ReviewerStudio {
       this.cards.unshift(card);
       importedCount++;
     });
+    const isTermDrillPresent = termCount > 0;
 
     this.saveCards();
-    showToast(`📥 Successfully imported ${importedCount} board question(s) into your LET review studio!`, 'success');
+    const summary = isTermDrillPresent
+      ? `📥 Imported ${importedCount - termCount} scenario MCQ(s) + ${termCount} term drill(s) into your LET Reviewer (Box 1 — re-test in 1 day).`
+      : `📥 Successfully imported ${importedCount} board question(s) into your LET review studio!`;
+    showToast(summary, 'success');
     this.render();
   }
 

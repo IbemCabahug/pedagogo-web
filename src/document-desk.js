@@ -543,7 +543,7 @@ export class DocumentDesk {
     });
 
     html = html.replace(/### (2\. 🧩 Structured Concept Chunks[\s\S]*?)(?=### 3\.|$)/, (m, c) => {
-      return `<div class="pedagogical-card card-chunks"><h3 class="card-header-chunks">2. 🧩 Structured Concept Chunks</h3><div class="card-body-content">${this.simpleMarkdown(c.replace('2. 🧩 Structured Concept Chunks', ''))}</div></div>`;
+      return `<div class="pedagogical-card card-chunks"><h3 class="card-header-chunks">2. 🧩 Structured Concept Chunks</h3><div class="card-body-content">${this.renderTermBankSection(c.replace('2. 🧩 Structured Concept Chunks', ''), md)}</div></div>`;
     });
 
     html = html.replace(/### (3\. 🧑‍🏫 "Teach It Simply"[\s\S]*?)(?=### 4\.|$)/, (m, c) => {
@@ -559,8 +559,8 @@ export class DocumentDesk {
         <div class="pedagogical-card card-retrieval">
           <div class="retrieval-header-bar">
             <h3 class="card-header-retrieval">5. 🎯 Licensure (LET) Retrieval Practice</h3>
-            <button class="btn-primary btn-save-questions-to-reviewer" id="btn-save-questions-to-reviewer" title="Save these practice questions to your permanent LET reviewer deck">
-              <span>➕ Save Questions to Reviewer</span>
+            <button class="btn-primary btn-save-questions-to-reviewer" id="btn-save-questions-to-reviewer" title="Save MCQs + term drills to your LET reviewer deck (spaced 1d / 3d / 7d)">
+              <span>➕ Save to LET Reviewer</span>
             </button>
           </div>
           <div class="card-body-content retrieval-body">${this.renderInteractiveQuiz(c)}</div>
@@ -602,13 +602,67 @@ export class DocumentDesk {
   }
 
   renderInteractiveQuiz(rawQuizText) {
-    const questionBlocks = rawQuizText.split(/\*\*Question \d+:\*\*/g).filter(b => b.trim().length > 0);
-    
-    return questionBlocks.map((block, idx) => {
+    // v1.3: Section 5 has Part A (2 scenario MCQs) + Part B (3 fill-ins) + Part C (Study Next).
+    // Split on both **Question N:** and **Fill-in N:** markers, keep legacy behavior for old 3-MCQ output.
+    const blocks = [];
+    const splitter = /\*\*(Question \d+|Fill-in \d+):\*\*/g;
+    let lastIdx = 0;
+    let lastLabel = null;
+    let m;
+    while ((m = splitter.exec(rawQuizText)) !== null) {
+      if (lastLabel !== null) {
+        blocks.push({ label: lastLabel, body: rawQuizText.slice(lastIdx, m.index) });
+      }
+      lastLabel = m[1];
+      lastIdx = m.index + m[0].length;
+    }
+    if (lastLabel !== null) {
+      blocks.push({ label: lastLabel, body: rawQuizText.slice(lastIdx) });
+    }
+    const questionBlocks = blocks.length > 0
+      ? blocks
+      : rawQuizText.split(/\*\*Question \d+:\*\*/g).filter(b => b.trim().length > 0).map((body, i) => ({ label: `Question ${i + 1}`, body }));
+
+    let fillCounter = 0;
+
+    return questionBlocks.map((item, idx) => {
+      const isFillIn = /^Fill-in/i.test(item.label || '');
+      const block = item.body || '';
+      if (isFillIn) {
+        fillCounter += 1;
+        const fNum = fillCounter;
+        const ansMatch = block.match(/\*\*Answer:\*\*\s*([^\n]+)/i);
+        const whyMatch = block.match(/\*\*Why:\*\*\s*([\s\S]*?)(?=(?:\*\*(?:Question|Fill-in|Study Next)|$))/i);
+        const answer = ansMatch ? ansMatch[1].trim() : 'See Term Bank';
+        const why = whyMatch ? whyMatch[1].trim() : 'Recall the in-text meaning from the Term Bank.';
+        const stem = block
+          .replace(/\*\*Answer:\*\*[\s\S]*$/, '')
+          .trim();
+        return `
+        <div class="quiz-question-card quiz-fill-in-card" data-qindex="fill-${fNum}">
+          <div class="question-header">
+            <span class="q-badge">Fill-in ${fNum}</span>
+            <span class="q-type-label">Term Drill</span>
+          </div>
+          <div class="question-body">
+            ${this.simpleMarkdown(stem)}
+          </div>
+          <div class="question-actions">
+            <button class="btn-reveal-answer" data-target="fill-rationale-${fNum}">
+              👁️ <span>Reveal Answer &amp; Why</span>
+            </button>
+          </div>
+          <div class="question-rationale-box" id="fill-rationale-${fNum}" style="display: none;">
+            <div class="rationale-answer-pill">Answer: ${this.simpleMarkdown(answer)}</div>
+            <p class="rationale-text"><strong>Why:</strong> ${this.simpleMarkdown(why)}</p>
+          </div>
+        </div>
+        `;
+      }
       const qNum = idx + 1;
       let answerMatch = block.match(/\*\*Correct Answer:\*\*\s*([A-D])/i);
       let answer = answerMatch ? answerMatch[1].toUpperCase() : 'A';
-      let rationaleMatch = block.match(/\*\*Pedagogical Rationalization:\*\*\s*([\s\S]*?)(?=(?:Question|$))/i);
+      let rationaleMatch = block.match(/\*\*Pedagogical Rationalization:\*\*\s*([\s\S]*?)(?=(?:\*\*(?:Question|Fill-in|Study Next)|$))/i);
       let rationale = rationaleMatch ? rationaleMatch[1].trim() : 'Active recall tests deep conceptual alignment.';
 
       let promptAndOptions = block
@@ -636,6 +690,72 @@ export class DocumentDesk {
         </div>
       `;
     }).join('');
+  }
+
+  /**
+   * v1.3 Term Bank — the "Familiarize FIRST" phase of the reading desk.
+   * Parses the 4-column markdown table (Term | In-Text Meaning | Memory Anchor | Source)
+   * that lives inside Section 2 and renders it as an interactive cover-to-recall grid.
+   * If no term bank table is present, renders the section content verbatim.
+   */
+  renderTermBankSection(convertedHtml, rawMd) {
+    const raw = (rawMd || '').match(/### 2\. 🧩 Structured Concept Chunks[\s\S]*?(?=### 3\.|$)/);
+    const sectionRaw = raw ? raw[0] : '';
+
+    // Match only term rows: | **Term** | meaning | anchor | [citation] |  (term may or may not be bolded)
+    const rows = [];
+    const rowRe = /^\|\s*(?:\*\*)?(.+?)(?:\*\*)?\s*\|(.+?)\|(.+?)\|(.+?)\|\s*$/gm;
+    let r;
+    while ((r = rowRe.exec(sectionRaw)) !== null) {
+      const term = r[1].trim();
+      const meaning = r[2].trim();
+      const anchor = r[3].trim();
+      const source = r[4].trim();
+      // Skip header / separator rows
+      if (!term || /^(In-Text Meaning|Term|:?-)/i.test(term)) continue;
+      if (/^\s*:?-/.test(meaning) && /^\s*:?-/.test(anchor)) continue;
+      rows.push({ term, meaning, anchor, source, start: r.index, end: r.index + r[0].length });
+    }
+
+    if (rows.length < 3) {
+      return this.simpleMarkdown(convertedHtml);
+    }
+
+    const firstStart = rows[0].start;
+    const lastEnd = rows[rows.length - 1].end;
+
+    const beforeMarkdown = sectionRaw.slice(0, firstStart).trim();
+    const afterMarkdown = sectionRaw.slice(lastEnd).trim();
+
+    const termRowsHtml = rows.map((t, i) => {
+      const sourceHtml = this.simpleMarkdown(t.source);
+      return `
+        <div class="term-bank-row">
+          <div class="term-bank-term">${this.escapeHtml(t.term)}</div>
+          <div class="term-bank-meaning">${this.simpleMarkdown(t.meaning)}</div>
+          <div class="term-bank-anchor">${this.simpleMarkdown(t.anchor)}</div>
+          <div class="term-bank-source">${sourceHtml}</div>
+        </div>`;
+    }).join('');
+
+    const beforeHtml = beforeMarkdown ? `<div class="term-bank-intro">${this.simpleMarkdown(beforeMarkdown)}</div>` : '';
+    const afterHtml = afterMarkdown ? `<div class="term-bank-after">${this.simpleMarkdown(afterMarkdown)}</div>` : '';
+
+    return `
+      <div class="term-bank-block">
+        ${beforeHtml}
+        <div class="term-bank-toolbar">
+          <span class="term-bank-hint">Familiarize first — cover the meanings, recall each term aloud, then reveal.</span>
+          <button type="button" class="btn-term-bank-cover" id="btn-term-bank-cover" aria-pressed="false">🙈 <span>Cover Meanings — Test Yourself</span></button>
+        </div>
+        <div class="term-bank-wrap" id="term-bank-wrap">
+          <div class="term-bank-grid term-bank-grid-head">
+            <span>Term</span><span>In-Text Meaning</span><span>Memory Anchor</span><span>Source</span>
+          </div>
+          ${termRowsHtml}
+        </div>
+        ${afterHtml}
+      </div>`;
   }
 
   renderVerbatimUnits(doc) {
@@ -839,13 +959,41 @@ export class DocumentDesk {
         const md = this.currentAnalysis?.markdown || '';
         const docTitle = this.currentDoc?.filename || 'Document Reading';
         
-        // Extract question blocks
+        // Extract v1.3 Section 5: Part A scenario MCQs + Part B term fill-ins. Legacy 3-MCQ output still parses.
         const qSection = md.split(/### 5\. 🎯 Licensure/i)[1] || '';
-        const rawQuestions = qSection.split(/\*\*Question \d+:\*\*/g).filter(b => b.trim().length > 0);
-        
-        const parsedQuestions = rawQuestions.map(block => {
+        const itemSplitter = /\*\*(Question \d+|Fill-in \d+):\*\*/g;
+        const rawItems = [];
+        let lastLabel = null;
+        let lastPos = 0;
+        let im;
+        while ((im = itemSplitter.exec(qSection)) !== null) {
+          if (lastLabel !== null) rawItems.push({ label: lastLabel, block: qSection.slice(lastPos, im.index) });
+          lastLabel = im[1];
+          lastPos = im.index + im[0].length;
+        }
+        if (lastLabel !== null) rawItems.push({ label: lastLabel, block: qSection.slice(lastPos) });
+        if (rawItems.length === 0) {
+          qSection.split(/\*\*Question \d+:\*\*/g).filter(b => b.trim().length > 0)
+            .forEach((block, i) => rawItems.push({ label: `Question ${i + 1}`, block }));
+        }
+
+        const parsedQuestions = rawItems.map(({ label, block }) => {
+          if (/^Fill-in/i.test(label)) {
+            const ansMatch = block.match(/\*\*Answer:\*\*\s*([^\n]+)/i);
+            const whyMatch = block.match(/\*\*Why:\*\*\s*([\s\S]*?)(?=(?:\*\*(?:Question|Fill-in|Study Next)|$))/i);
+            return {
+              question: `${label}: ${(block.replace(/\*\*Answer:\*\*[\s\S]*$/, '').trim() || '').slice(0, 500)}`,
+              front: `${label}: ${(block.replace(/\*\*Answer:\*\*[\s\S]*$/, '').trim() || '').slice(0, 500)}`,
+              answer: ansMatch ? ansMatch[1].trim() : 'See Term Bank',
+              correctAnswer: ansMatch ? ansMatch[1].trim() : '',
+              rationalization: whyMatch ? whyMatch[1].trim() : 'Recall the in-text meaning from the Term Bank.',
+              explanation: whyMatch ? whyMatch[1].trim() : '',
+              options: [],
+              cardKind: 'TERM_FILL_IN'
+            };
+          }
           const ansMatch = block.match(/\*\*Correct Answer:\*\*\s*([A-D])/i);
-          const rationaleMatch = block.match(/\*\*Pedagogical Rationalization:\*\*\s*([\s\S]*?)(?=(?:Question|$))/i);
+          const rationaleMatch = block.match(/\*\*Pedagogical Rationalization:\*\*\s*([\s\S]*?)(?=(?:\*\*(?:Question|Fill-in|Study Next)|$))/i);
           const prompt = block.replace(/\*\*Correct Answer:\*\*[\s\S]*$/, '').trim();
           
           const options = [];
@@ -855,10 +1003,15 @@ export class DocumentDesk {
           }
 
           return {
+            question: prompt,
+            front: prompt,
             prompt,
             options,
             correctAnswer: ansMatch ? ansMatch[1].toUpperCase() : 'A',
-            rationale: rationaleMatch ? rationaleMatch[1].trim() : 'Active recall practice'
+            rationale: rationaleMatch ? rationaleMatch[1].trim() : 'Active recall practice',
+            rationalization: rationaleMatch ? rationaleMatch[1].trim() : 'Active recall practice',
+            explanation: rationaleMatch ? rationaleMatch[1].trim() : '',
+            cardKind: 'SCENARIO_MCQ'
           };
         });
 
@@ -872,7 +1025,7 @@ export class DocumentDesk {
 
         btnSaveQuestions.innerHTML = '✓ <span>Saved to LET Reviewer!</span>';
         setTimeout(() => {
-          btnSaveQuestions.innerHTML = '<span>➕ Save Questions to Reviewer</span>';
+          btnSaveQuestions.innerHTML = '<span>➕ Save to LET Reviewer</span>';
         }, 2200);
       });
     }
@@ -905,6 +1058,18 @@ export class DocumentDesk {
         }
       });
     });
+
+    // Term Bank cover/uncover (Familiarize phase — self-test term meanings)
+    const btnTermBankCover = document.getElementById('btn-term-bank-cover');
+    if (btnTermBankCover) {
+      btnTermBankCover.addEventListener('click', () => {
+        const wrap = document.getElementById('term-bank-wrap');
+        if (!wrap) return;
+        const covered = wrap.classList.toggle('term-bank-covered');
+        btnTermBankCover.setAttribute('aria-pressed', String(covered));
+        btnTermBankCover.innerHTML = covered ? '👁️ <span>Reveal Meanings</span>' : '🙈 <span>Cover Meanings — Test Yourself</span>';
+      });
+    }
 
     // Upgrade Gemini pill
     const btnUpgradeGemini = document.getElementById('btn-upgrade-gemini-pill');

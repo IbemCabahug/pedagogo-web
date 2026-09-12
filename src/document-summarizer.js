@@ -110,19 +110,21 @@ export class DocumentSummarizer {
 Your mission is to transform dense educational, academic, and pedagogical reading materials (curriculum guides, textbook chapters, developmental theories, DepEd orders, or lecture slides) into an exemplary, high-retention study guide for pre-service teachers and education students.
 
 CRITICAL ACCURACY & GROUNDING RULES (boundaries — never break):
-1. CITATION BADGES: Every bullet in sections 1, 2, and 4 ends with [Page X] / [Slide Y] / [Paragraph N] from the input markers. If unsure, write [Source unclear] — never guess.
+1. CITATION BADGES: Every bullet in sections 1, 2, 4 ends with [Page X] / [Slide Y]. Every Term Bank row ends with one too. If unsure, write [Source unclear] — never guess.
 2. STRICT GROUNDING: Stick to the text. Do NOT invent DepEd orders, authors, dates, or stats. If not stated, write "Not stated in this text."
-3. WORD BUDGETS: TL;DR <= 60 words. Each chunk 60-80 words. Whole response <= 900 words. Max 3 chunks; 2 strong beats 3 weak.
-4. FORMATTING CONTRACT: Output EXACTLY the five headings below, in order. Keep --- separators. LET answers as options A-D then **Correct Answer: X** + **Pedagogical Rationalization:** lines for attempt-before-reveal rendering.
+3. TERM FIRST: Extract 5-8 load-bearing terms actually IN the text. Gloss the IN-TEXT meaning.
+4. WORD BUDGETS: TL;DR <= 60 words. Each chunk 60-80 words. Each term row 25 words max. Whole response <= 1100 words. Max 3 chunks; 2 strong beats 3 weak.
+5. FORMATTING CONTRACT: Output EXACTLY the five headings below, in order. Keep --- separators. Term Bank lives INSIDE Section 2 as a table. LET answers as options A-D then Correct Answer + Rationalization lines. Fill-ins as numbered blanks then Answer + Why lines.
 
 ### 1. 🎓 Cornell Synthesis & Active Cues
 - **TL;DR [Primary Text Extraction]:** 2 sentences, <= 60 words.
-- **Why It Matters:** 1 sentence classroom / LET transfer.
+- **Why It Matters:** 1 sentence classroom / LET transfer, PLUS which study type to start with (Familiarize / Understand / Memorize) and why in 8 words or fewer.
 - **Active Recall Cue Questions:** exactly 3 open-ended Who/Why/How questions for Cornell cues.
 
 ### 2. 🧩 Structured Concept Chunks
-- Max 3 chunks, each 60-80 words, bolded title + **keywords** + citation. One idea per chunk.
-- If only 2 ideas exist, output 2 and write "*Only two load-bearing ideas in this text.*"
+Part A - Term Bank (familiarize FIRST): 4-column table with header Term | In-Text Meaning (15 words max) | Memory Anchor | Source. 5-8 rows, one term per row. Memory Anchor 5 words max.
+Part B - Chunks (understand NEXT): Max 3 chunks, each 60-80 words, bolded title + keywords + citation. One idea per chunk.
+- If only 2 ideas exist, output 2 and write "Only two load-bearing ideas in this text."
 
 ### 3. 🧑‍🏫 "Teach It Simply" (Classroom Translation)
 - **In Plain Words:** 2 sentences, Grade 8 level.
@@ -134,7 +136,7 @@ CRITICAL ACCURACY & GROUNDING RULES (boundaries — never break):
 - ELSE output exactly: No meaningful contrast in this text — focus on mastery of the chunks above. Never force a comparison.
 
 ### 5. 🎯 Licensure (LET) Retrieval Practice Checkpoint
-- 3 scenario MCQs covering 3 different chunks. Format:
+Part A - 2 scenario MCQs (application): Format:
   **Question N:** [scenario stem]
   - A) [Option]
   - B) [Option]
@@ -142,8 +144,13 @@ CRITICAL ACCURACY & GROUNDING RULES (boundaries — never break):
   - D) [Option]
   - **Correct Answer:** [Letter]
   - **Pedagogical Rationalization:** [1-2 sentences + citation].
+Part B - 3 term fill-ins (terminology): Format:
+  **Fill-in N:** [sentence with _____ blank + 6-word hint]
+  - **Answer:** [term]
+  - **Why:** [1 sentence gloss + citation].
+Part C - Study Next: one line naming Familiarize / Understand / Memorize + action + spacing.
 
-Maintain an encouraging, rigorous tone throughout. Total response <= 900 words.`;
+Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.`;
   }
 
   /**
@@ -609,8 +616,37 @@ Section 3: Child Protection Committee (CPC). Every elementary and secondary scho
     
     const q1Answer = def1 ? def1.definition : `It ensures that cognitive demands align with learner readiness and curricular standards`;
 
+    // --- v1.3 Term Bank (from regex definition extraction, fallback to top keywords) ---
+    const bankTerms = [];
+    for (const d of definitionMatches.slice(0, 6)) {
+      const gloss = d.definition.split(/\s+/).slice(0, 14).join(' ');
+      bankTerms.push(`| **${d.term.trim()}** | ${gloss} | Anchor: picture it in your future classroom | [Primary Text Extraction] |`);
+    }
+    if (bankTerms.length < 5) {
+      for (const kw of sortedKeywords) {
+        if (bankTerms.length >= 5) break;
+        const label = kw.trim();
+        if (bankTerms.some(t => t.includes(`**${label}**`))) continue;
+        bankTerms.push(`| **${label}** | Core term this reading builds on | Anchor: link to ${keyTerm1.toLowerCase()} lesson | [Primary Text Extraction] |`);
+      }
+    }
+
+    // --- v1.3 Fill-in drills (terminology retrieval) ---
+    const fillDefs = definitionMatches.slice(0, 3);
+    const fillBlocks = fillDefs.map((d, i) => {
+      const termRe = new RegExp(d.term.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      const safeHint = (d.fullSentence || '').replace(termRe, '').split(/\s+/).filter(Boolean).slice(0, 6).join(' ');
+      return `**Fill-in ${i + 1}:** According to this reading, _____ ${safeHint ? '(' + safeHint + ')' : ''}\n- **Answer:** ${d.term.trim()}\n- **Why:** The text uses this term for ${d.definition.split(/\s+/).slice(0, 12).join(' ')} [Primary Text Extraction]`;
+    });
+    while (fillBlocks.length < 3) {
+      const idx = fillBlocks.length;
+      const kw = sortedKeywords[idx] || keyTerm1;
+      fillBlocks.push(`**Fill-in ${idx + 1}:** One load-bearing idea that recurs across this reading is _____ (hint: among the text's most salient core concepts)\n- **Answer:** ${kw}\n- **Why:** TextRank salience ranks this among the top recurring terms of the text [Primary Text Extraction]`);
+    }
+
     const markdown = `### 1. 🎓 Cornell Synthesis & Active Cues
 - **Macro-Synthesis [Primary Text Extraction]:** ${macroSynthesis}
+- **Why It Matters:** This reading feeds your ${keyTerm1.toLowerCase()} lesson design and LET ProfEd items — start with Familiarize, the term bank below.
 - **Active Recall Cue Questions:**
 ${cueQuestions.map(q => `  - ${q}`).join('\n')}
 
@@ -618,6 +654,14 @@ ${cueQuestions.map(q => `  - ${q}`).join('\n')}
 
 ### 2. 🧩 Structured Concept Chunks
 *Extracted via TextRank graph analysis from the ${extractedDoc.totalUnits} ${extractedDoc.unitLabel.toLowerCase()} of **${filename}**:*
+
+**Part A — Term Bank** *(familiarize FIRST: cover the middle column, recall aloud)*
+
+| Term | In-Text Meaning (15 words max) | Memory Anchor | Source |
+| :--- | :--- | :--- | :--- |
+${bankTerms.join('\n')}
+
+**Part B — Chunks** *(understand NEXT)*
 
 ${chunksMarkdown}
 
@@ -642,13 +686,15 @@ ${matrixRowB}
 
 ### 5. 🎯 Licensure (LET) Retrieval Practice Checkpoint
 
+**Part A — Scenario Application** *(attempt before reveal)*
+
 **Question 1:** ${q1Stem}
 - A) To satisfy administrative compliance without regard for student readiness
 - B) ${q1Answer}
 - C) To replace formative evaluation with mechanical memorization
 - D) To eliminate differentiated instruction from lesson planning
 - **Correct Answer:** **B**
-- **Pedagogical Rationalization:** Effective instructional design requires aligning tasks with students' developmental readiness and evidence-based standards, preventing extraneous cognitive load and fostering authentic competence.
+- **Pedagogical Rationalization:** Effective instructional design requires aligning tasks with students' developmental readiness and evidence-based standards, preventing extraneous cognitive load and fostering authentic competence. [Primary Text Extraction]
 
 **Question 2:** Which classroom scenario best demonstrates the appropriate pedagogical execution of **${keyTerm2}** as described in the text?
 - A) Teacher facilitates collaborative inquiry and guided problem-solving before formalizing definitions
@@ -656,15 +702,14 @@ ${matrixRowB}
 - C) Teacher assigns complex homework without modeling or scaffolding
 - D) Teacher relies solely on rote recitation of factual definitions
 - **Correct Answer:** **A**
-- **Pedagogical Rationalization:** Learner-centered pedagogy mandates providing exploratory experiences and scaffolded dialogue before formalizing definitions.
+- **Pedagogical Rationalization:** Learner-centered pedagogy mandates providing exploratory experiences and scaffolded dialogue before formalizing definitions. [Primary Text Extraction]
 
-**Question 3:** When evaluating student mastery of **${keyTerm3}**, what should serve as the primary indicator of authentic learning?
-- A) Speed of submission above all else
-- B) Verbatim memorization of textbook sentences
-- C) Demonstrable transfer and creative application to authentic classroom problems
-- D) Ability to reproduce teacher notes without variation
-- **Correct Answer:** **C**
-- **Pedagogical Rationalization:** Under DepEd Order No. 8, s. 2015 and modern assessment science, authentic learning is evidenced by transfer and higher-order application rather than mechanical recitation.`;
+**Part B — Term Fill-in Drills** *(recall from the Term Bank)*
+
+${fillBlocks.join('\n\n')}
+
+**Part C — Study Next**
+- **Study Next:** Memorize — attempt the fill-ins cold, push misses to the LET Reviewer (Box 1), re-test in 1 day.`;
 
     return {
       source: 'LOCAL_TEXTRANK_ENGINE',

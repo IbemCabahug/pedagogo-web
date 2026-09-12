@@ -3428,6 +3428,125 @@ body.dark-mode .contrastive-matrix-table tr:nth-child(even) {
   line-height: 1.45;
 }
 
+/* Term Bank (v1.3 Familiarize phase) */
+.term-bank-block {
+  margin-top: 4px;
+}
+
+.term-bank-intro {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.term-bank-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.term-bank-hint {
+  font-size: 11.5px;
+  color: var(--terracotta-text);
+  background: var(--terracotta-light);
+  border: 1px solid var(--terracotta-secondary);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.btn-term-bank-cover {
+  border: 1px solid var(--sage-primary);
+  background: var(--sage-light);
+  color: var(--sage-text);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-term-bank-cover:hover {
+  background: var(--sage-primary);
+  color: #fff;
+}
+
+.term-bank-wrap {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.term-bank-grid {
+  display: grid;
+  grid-template-columns: 22% 40% 26% 12%;
+  align-items: center;
+}
+
+.term-bank-grid-head {
+  background: var(--sage-primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 12px;
+}
+
+.term-bank-row {
+  display: grid;
+  grid-template-columns: 22% 40% 26% 12%;
+  align-items: center;
+  border-top: 1px solid var(--border-light);
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  background: var(--surface-white);
+}
+
+.term-bank-row:nth-child(even) {
+  background: var(--surface-subtle);
+}
+
+.term-bank-term {
+  font-weight: 800;
+  color: var(--terracotta-text);
+  padding-right: 10px;
+}
+
+.term-bank-meaning {
+  color: var(--text-main);
+  padding-right: 10px;
+  transition: opacity 0.15s ease;
+}
+
+.term-bank-anchor {
+  color: var(--text-muted);
+  font-style: italic;
+  padding-right: 10px;
+}
+
+.term-bank-source {
+  font-size: 11.5px;
+}
+
+/* Covered state: hide meanings so the learner self-tests, keep anchors/sources visible */
+.term-bank-wrap.term-bank-covered .term-bank-meaning {
+  opacity: 0.22;
+  filter: blur(2px);
+  user-select: none;
+}
+
+.term-bank-after {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-light);
+}
+
 /* Verbatim Panel */
 .verbatim-toolbar {
   display: flex;
