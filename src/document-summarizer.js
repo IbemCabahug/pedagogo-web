@@ -1,5 +1,6 @@
 import synthesisPromptV1 from './prompts/reading-synthesis.v1.md?raw';
 import quickPromptV1 from './prompts/summary-quick.v1.md?raw';
+import { ReadingTelemetry } from './reading-telemetry.js';
 
 /**
  * Pedagogo Desk: Pedagogical Document Summarizer & AI Engine 🧠🌿
@@ -157,7 +158,9 @@ export class DocumentSummarizer {
 
   // Sprint A.5 (2026-09-13 refresh) — Gemini 2.x/1.5 retired per Google (404:
   // "gemini-2.5-flash is no longer available for new users, use gemini-3.6-flash").
-  // Defaults now target the 3.x Flash family on v1beta generateContent.
+  // Defaults now target the 3.x Flash family. Sprint P0 (2026-09-13): transport
+  // migrated to the Interactions API (GA June 2026 per ai.google.dev), with the
+  // legacy v1beta generateContent kept as a silent per-model failover.
   static DEFAULT_MODEL = 'gemini-3.6-flash';
 
   static getAvailableModels() {
@@ -188,25 +191,108 @@ export class DocumentSummarizer {
    * must travel in the `x-goog-api-key` header, not `?key=` query param.
    * Header form works for BOTH legacy AIza keys and new AQ auth keys,
    * and keeps the key out of the URL (logs / history).
+   * Sprint P0 — the same header is what the Interactions API quickstart
+   * documents, so both key formats are re-verified on the new endpoint too.
    */
   static getGeminiHeaders(apiKey) {
     return { 'Content-Type': 'application/json', 'x-goog-api-key': (apiKey || '').trim() };
   }
 
+  /** Legacy route: v1beta models/:generateContent (still fully supported, used as silent failover). */
   static buildGeminiEndpoint(modelId) {
     return `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`;
   }
 
   /**
+   * Sprint P0 (2026-09-13) — Interactions API route (GA June 2026 per
+   * ai.google.dev: "As of June 2026, it is Generally Available and recommended
+   * for all new projects"). REST contract, confirmed against the @google/genai
+   * 2.3+ type definitions and the quickstart curl:
+   *   POST /v1beta/interactions   (x-goog-api-key header)
+   *   { model, input: [ {type:'text', text} | {type:'document', data:<base64>, mime_type} | {type:'image', data, mime_type} ],
+   *     generation_config: { max_output_tokens }, store: false }
+   *   Response: { id, status, steps: [ {type:'model_output', content: [ {type:'text', text} ]} ], usage }
+   * Notes:
+   * - Interactions generation_config has NO temperature/topP/topK (deterministic
+   *   tuning lives on the legacy route only); max_output_tokens maps 1:1.
+   * - store:false keeps us stateless — zero server-side conversation retention,
+   *   matching Pedagogo's local-only data stance.
+   */
+  static buildInteractionsEndpoint() {
+    return 'https://generativelanguage.googleapis.com/v1beta/interactions';
+  }
+
+  /** Map a prompt (+ optional inline multimodal file) to Interactions input content blocks. */
+  static _buildInteractionsInput(prompt, extractedDoc) {
+    const items = [{ type: 'text', text: prompt }];
+    if (extractedDoc && extractedDoc.base64Data && (extractedDoc.fileType === 'PDF' || extractedDoc.fileType === 'IMAGE')) {
+      items.push({
+        type: extractedDoc.fileType === 'PDF' ? 'document' : 'image',
+        data: extractedDoc.base64Data,
+        mime_type: extractedDoc.mimeType || (extractedDoc.fileType === 'PDF' ? 'application/pdf' : 'image/jpeg')
+      });
+    }
+    return items;
+  }
+
+  /**
+   * Extract concatenated model text from a raw Interactions API response.
+   * `output_text` is SDK-added convenience (not raw REST), so the primary
+   * extraction walks the typed steps: model_output -> text content blocks.
+   */
+  static _extractInteractionText(data) {
+    if (!data) return '';
+    if (typeof data.output_text === 'string' && data.output_text.trim()) return data.output_text;
+    const steps = Array.isArray(data.steps) ? data.steps : [];
+    const chunks = [];
+    for (const step of steps) {
+      if (!step || step.type !== 'model_output') continue;
+      const content = Array.isArray(step.content) ? step.content : [];
+      for (const block of content) {
+        if (block && block.type === 'text' && typeof block.text === 'string' && block.text.trim()) chunks.push(block.text);
+      }
+    }
+    return chunks.join('\n');
+  }
+
+  /** Sprint P0 — route telemetry (local-only localStorage counters, never network). */
+  static _logRouteTelemetry(eventName) {
+    try { ReadingTelemetry.log(eventName); } catch { /* best-effort */ }
+  }
+
+  /**
    * Sprint A — in-app BYOK test call: verifies a pasted key with a tiny
    * Gemini request before saving, so students get instant success/failure.
-   * Returns { ok: true, model } or { ok: false, message }.
+   * Returns { ok: true, model, route } or { ok: false, message }.
+   * Sprint P0 — verifies against the Interactions API first (same
+   * x-goog-api-key header, so both legacy AIza and new AQ. keys are
+   * re-validated on the new endpoint), then fails over to legacy
+   * generateContent. Whichever route answers ok wins.
    */
   static async testApiKey(apiKey, modelId = this.DEFAULT_MODEL) {
     const key = (apiKey || '').trim();
     if (!key || key.length < 10) {
       return { ok: false, message: 'That key looks too short — paste the full key from AI Studio.' };
     }
+    // Route 1: Interactions API (GA June 2026).
+    try {
+      const res = await fetch(this.buildInteractionsEndpoint(), {
+        method: 'POST',
+        headers: this.getGeminiHeaders(key),
+        body: JSON.stringify({
+          model: modelId,
+          input: 'Reply with the single word: ok',
+          generation_config: { max_output_tokens: 8 },
+          store: false
+        })
+      });
+      if (res.ok) {
+        this._logRouteTelemetry('route_interactions_ok');
+        return { ok: true, model: modelId, route: 'interactions' };
+      }
+    } catch (err) { /* network hiccup — the legacy route below reports honestly */ }
+    this._logRouteTelemetry('route_interactions_failover');
+    // Route 2 (failover): legacy v1beta models/:generateContent.
     const endpoint = this.buildGeminiEndpoint(modelId);
     try {
       const res = await fetch(endpoint, {
@@ -217,7 +303,7 @@ export class DocumentSummarizer {
           generationConfig: { temperature: 0, maxOutputTokens: 8 }
         })
       });
-      if (res.ok) return { ok: true, model: modelId };
+      if (res.ok) return { ok: true, model: modelId, route: 'generateContent' };
       const errJson = await res.json().catch(() => ({}));
       const msg = errJson?.error?.message || `HTTP ${res.status}`;
       return { ok: false, message: msg };
@@ -484,48 +570,73 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
       ];
     }
 
-    const promptPayload = {
-      contents: [{ role: 'user', parts }],
-      generationConfig: {
-        temperature: 0.15, // Low + stable: factual, on-format, low hallucination for study sheets
-        topP: 0.9, // Slightly focused nucleus sampling: fewer off-format drifts, analogy still fresh
-        topK: 32, // Constrain wild token choices on long docs without flattening the analogy
-        maxOutputTokens: 8192
-      }
-    };
-
-    // Try primary model, then fallback if needed
+    // Sprint P0: try each model through the Interactions API first (GA June 2026),
+    // then silently fail over to legacy generateContent on the same model.
     for (const model of modelsToTry) {
-      const endpoint = this.buildGeminiEndpoint(model);
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: this.getGeminiHeaders(apiKey),
-          body: JSON.stringify(promptPayload)
-        });
-
-        if (!response.ok) {
-          const errJson = await response.json().catch(() => ({}));
-          const errMsg = errJson?.error?.message || `HTTP ${response.status} ${response.statusText}`;
-          console.warn(`Gemini API (${model}) returned error: ${errMsg}. Trying fallback if available.`);
-          continue;
+      // Reuse the first text part (system prompt + doc header) so both routes see identical wording.
+      const prompt = parts[0] && parts[0].text ? parts[0].text : '';
+      const routes = [
+        {
+          name: 'interactions',
+          endpoint: this.buildInteractionsEndpoint(),
+          telemetry: 'route_interactions_ok',
+          body: {
+            model,
+            input: this._buildInteractionsInput(prompt, extractedDoc),
+            generation_config: { max_output_tokens: 8192 },
+            store: false
+          }
+        },
+        {
+          name: 'generateContent',
+          endpoint: this.buildGeminiEndpoint(model),
+          telemetry: 'route_interactions_failover',
+          body: {
+            contents: [{ role: 'user', parts }],
+            generationConfig: {
+              temperature: 0.15, // Low + stable: factual, on-format, low hallucination for study sheets (legacy route only)
+              topP: 0.9, // Slightly focused nucleus sampling: fewer off-format drifts, analogy still fresh
+              topK: 32, // Constrain wild token choices on long docs without flattening the analogy
+              maxOutputTokens: 8192
+            }
+          }
         }
+      ];
 
-        const data = await response.json();
-        const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      for (const route of routes) {
+        try {
+          const response = await fetch(route.endpoint, {
+            method: 'POST',
+            headers: this.getGeminiHeaders(apiKey),
+            body: JSON.stringify(route.body)
+          });
 
-        if (generatedText && generatedText.trim().length > 50) {
-          const modelMeta = this.getAvailableModels().find(m => m.id === model);
-          return {
-            source: 'GEMINI_API',
-            modelName: modelMeta?.name || model,
-            isMultimodal: canUseMultimodal,
-            markdown: generatedText,
-            analyzedAt: new Date().toISOString()
-          };
+          if (!response.ok) {
+            const errJson = await response.json().catch(() => ({}));
+            const errMsg = errJson?.error?.message || `HTTP ${response.status} ${response.statusText}`;
+            console.warn(`Gemini API (${model} via ${route.name}) returned error: ${errMsg}. Trying next route.`);
+            continue;
+          }
+
+          const data = await response.json();
+          const generatedText = route.name === 'interactions'
+            ? this._extractInteractionText(data)
+            : data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+          if (generatedText && generatedText.trim().length > 50) {
+            this._logRouteTelemetry(route.telemetry);
+            const modelMeta = this.getAvailableModels().find(m => m.id === model);
+            return {
+              source: 'GEMINI_API',
+              modelName: modelMeta?.name || model,
+              isMultimodal: canUseMultimodal,
+              markdown: generatedText,
+              analyzedAt: new Date().toISOString()
+            };
+          }
+        } catch (err) {
+          console.warn(`Fetch error for model ${model} via ${route.name}:`, err);
         }
-      } catch (err) {
-        console.warn(`Fetch error for model ${model}:`, err);
       }
     }
 
@@ -559,22 +670,46 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
       generationConfig: { temperature: 0.15, topP: 0.9, topK: 32, maxOutputTokens: maxTokens || 8192 }
     };
     for (const model of modelsToTry) {
-      const endpoint = this.buildGeminiEndpoint(model);
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: this.getGeminiHeaders(apiKey),
-          body: JSON.stringify(payload)
-        });
-        if (!response.ok) continue;
-        const data = await response.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text && text.trim().length > 20) {
-          const modelMeta = this.getAvailableModels().find(m => m.id === model);
-          return { text: text.trim(), modelName: modelMeta?.name || model, isMultimodal: canUseMultimodal };
+      // Sprint P0: Interactions first, legacy generateContent as silent failover.
+      const routes = [
+        {
+          name: 'interactions',
+          endpoint: this.buildInteractionsEndpoint(),
+          telemetry: 'route_interactions_ok',
+          body: {
+            model,
+            input: this._buildInteractionsInput(systemPrompt, extractedDoc),
+            generation_config: { max_output_tokens: maxTokens || 8192 },
+            store: false
+          }
+        },
+        {
+          name: 'generateContent',
+          endpoint: this.buildGeminiEndpoint(model),
+          telemetry: 'route_interactions_failover',
+          body: payload
         }
-      } catch (err) {
-        console.warn(`Gemini quick (${model}) fetch error:`, err);
+      ];
+      for (const route of routes) {
+        try {
+          const response = await fetch(route.endpoint, {
+            method: 'POST',
+            headers: this.getGeminiHeaders(apiKey),
+            body: JSON.stringify(route.body)
+          });
+          if (!response.ok) continue;
+          const data = await response.json();
+          const text = route.name === 'interactions'
+            ? this._extractInteractionText(data)
+            : data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text && text.trim().length > 20) {
+            this._logRouteTelemetry(route.telemetry);
+            const modelMeta = this.getAvailableModels().find(m => m.id === model);
+            return { text: text.trim(), modelName: modelMeta?.name || model, isMultimodal: canUseMultimodal };
+          }
+        } catch (err) {
+          console.warn(`Gemini quick (${model} via ${route.name}) fetch error:`, err);
+        }
       }
     }
     return null;
