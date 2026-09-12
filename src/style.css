@@ -3109,6 +3109,118 @@ body.dark-mode .zen-fullscreen-overlay {
   color: var(--sage-primary);
 }
 
+/* Sprint B: honest sync-status chips (risk-fix communication layer) */
+.chip-sync-warn {
+  background: var(--honey-light);
+  color: var(--honey-text);
+  border: 1px solid rgba(217, 131, 38, 0.35);
+  font-weight: 700;
+  cursor: help;
+}
+
+.chip-sync-ok {
+  background: var(--sage-light);
+  color: var(--sage-text);
+  border: 1px solid rgba(59, 99, 71, 0.3);
+  font-weight: 700;
+  cursor: help;
+}
+
+/* Sprint B: "Pick up where you left off" resume strip (upload state) */
+.desk-resume-strip {
+  margin: 0 auto 18px;
+  max-width: 860px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-light);
+  border-radius: 14px;
+  padding: 14px 16px 16px;
+}
+
+.resume-strip-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.resume-strip-header span:first-child {
+  font-size: 14px;
+}
+
+.resume-sub {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted, #7A756B);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.resume-cards {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.desk-resume-card {
+  flex: 1 1 240px;
+  max-width: 300px;
+  background: var(--surface-white);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.resume-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.btn-resume-delete {
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #7A756B);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 1;
+}
+
+.btn-resume-delete:hover {
+  background: var(--terracotta-light);
+  color: var(--terracotta-text);
+}
+
+.resume-filename {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resume-meta {
+  font-size: 11.5px;
+  color: var(--text-muted, #7A756B);
+  margin: 0;
+}
+
+.desk-resume-card .btn-primary {
+  align-self: flex-start;
+  font-size: 12.5px;
+  padding: 6px 14px;
+}
+
 .citation-pill {
   display: inline-flex;
   align-items: center;

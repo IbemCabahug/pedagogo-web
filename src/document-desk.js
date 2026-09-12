@@ -8,8 +8,12 @@ import { DocumentParser } from './document-parser.js';
 import { DocumentSummarizer } from './document-summarizer.js';
 import { showToast } from './toast.js';
 import { ReadingTelemetry } from './reading-telemetry.js';
+import { SyncManager } from './sync-manager.js';
 
 export class DocumentDesk {
+  static SESSIONS_KEY = 'pedagogo_reading_sessions';
+  static SYNC_KEY = 'pedagogo_reading_sync';
+
   constructor() {
     this.currentDoc = null;
     this.currentAnalysis = null;
@@ -30,6 +34,15 @@ export class DocumentDesk {
     if (this.container) {
       this.claimInviteKey();
       this.render();
+      // Sprint B risk fix: a restored backup archive adds desk sessions (resume
+      // strip appears), and a fresh export flips the desk chip to "Backed up".
+      window.addEventListener('pedagogo:data-restored', () => { if (this.container) this.render(); });
+      window.addEventListener('pedagogo:backup-exported', () => { if (this.container && this.currentDoc) this.render(); });
+      // Flush pending session save before the tab sleeps/closes (risk-fix: no lost tail)
+      window.addEventListener('pagehide', () => this.flushSession());
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') this.flushSession();
+      });
     }
   }
 
@@ -77,6 +90,184 @@ export class DocumentDesk {
     } catch (e) { return false; }
   }
 
+  // ============================================================
+  // Sprint B — Session continuity + honest sync status (risk fixes)
+  // "Web is a tool" model: desk work lives in this browser until the
+  // user exports a backup or syncs to the phone. Chip + resume strip
+  // + backup button make that contract visible and cheap to meet.
+  // ============================================================
+
+  // Stable id per document (filename + unit count + text length)
+  makeDocId(doc) {
+    try {
+      return `${doc.filename || 'doc'}::${doc.totalUnits || 0}::${(doc.rawText || '').length}`;
+    } catch (e) { return `doc::${Date.now()}`; }
+  }
+
+  loadSyncRecord() {
+    try { return JSON.parse(localStorage.getItem(this.SYNC_KEY) || 'null'); } catch (e) { return null; }
+  }
+
+  loadDeskSessions(asMap = false) {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(this.SESSIONS_KEY) || '{}');
+      if (asMap) return parsed;
+      if (!parsed || typeof parsed !== 'object') return [];
+      return Object.values(parsed).sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
+    } catch (e) { return asMap ? {} : []; }
+  }
+
+  persistSession() {
+    // Debounced: tab switches / split toggles shouldn't stringify megabytes on every click
+    if (this._persistTimer) clearTimeout(this._persistTimer);
+    this._persistTimer = setTimeout(() => this._persistSessionNow(), 400);
+  }
+
+  flushSession() {
+    if (this._persistTimer) { clearTimeout(this._persistTimer); this._persistTimer = null; }
+    this._persistSessionNow();
+  }
+
+  _persistSessionNow() {
+    if (!this.currentDoc || !this.currentDocId) return;
+    try {
+      const sessions = this.loadDeskSessions(true) || {};
+      const docCopy = Object.assign({}, this.currentDoc);
+      if (docCopy.base64Data) {
+        // Multimodal bytes are too large for localStorage; resumable text survives.
+        docCopy.multimodalAvailable = true;
+        delete docCopy.base64Data;
+      }
+      const entry = {
+        id: this.currentDocId,
+        filename: this.currentDoc.filename,
+        fileType: this.currentDoc.fileType,
+        totalUnits: this.currentDoc.totalUnits,
+        unitLabel: this.currentDoc.unitLabel,
+        savedAt: this.currentSessionSavedAt,
+        doc: docCopy,
+        analysis: this.currentAnalysis,
+        activeSubTab: this.activeSubTab,
+        activeSummaryType: this.activeSummaryType,
+        isSplitView: this.isSplitView,
+        isCornellFolded: this.isCornellFolded,
+        verbatimVisibleCount: this.verbatimVisibleCount
+      };
+      sessions[entry.id] = entry;
+
+      // Bound storage: keep at most the 3 most recent desk sessions
+      const entries = Object.values(sessions).sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
+      while (entries.length > 3) {
+        const oldest = entries.pop();
+        if (oldest && oldest.id !== entry.id) delete sessions[oldest.id];
+      }
+
+      try {
+        localStorage.setItem(this.SESSIONS_KEY, JSON.stringify(sessions));
+      } catch (quotaErr) {
+        // Quota exceeded (huge doc): keep only this session and retry once
+        const trimmed = {};
+        trimmed[entry.id] = entry;
+        localStorage.setItem(this.SESSIONS_KEY, JSON.stringify(trimmed));
+      }
+
+      if (!this._loggedSaveIds) this._loggedSaveIds = new Set();
+      if (!this._loggedSaveIds.has(entry.id)) {
+        this._loggedSaveIds.add(entry.id);
+        try { ReadingTelemetry.log('session_auto_saved'); } catch (e) {}
+      }
+    } catch (e) { /* persistence is best-effort; never block the desk */ }
+  }
+
+  resumeSession(id) {
+    const sessions = this.loadDeskSessions(true) || {};
+    const s = sessions[id];
+    if (!s || !s.doc) return;
+    const originalSavedAt = s.savedAt;
+    this.currentDoc = s.doc;
+    this.currentAnalysis = s.analysis || null;
+    this.activeSubTab = s.activeSubTab || 'synthesis';
+    this.activeSummaryType = s.activeSummaryType || null;
+    this.isSplitView = Boolean(s.isSplitView);
+    this.isCornellFolded = Boolean(s.isCornellFolded);
+    this.verbatimVisibleCount = s.verbatimVisibleCount || 25;
+    this.currentDocId = s.id;
+    this.currentSessionSavedAt = new Date().toISOString(); // touch → recency
+    try { ReadingTelemetry.log('session_resumed'); } catch (e) {}
+    if (!this._loggedSaveIds) this._loggedSaveIds = new Set();
+    this._loggedSaveIds.add(s.id); // don't double-log auto-save for a resumed doc
+    this.persistSession();
+    this.render();
+    showToast(`Resumed "${s.filename}" — right where you left it.`, 'success');
+    const last = this.loadSyncRecord()?.lastBackupAt;
+    if (!last || new Date(last) < new Date(originalSavedAt)) {
+      setTimeout(() => showToast(`Last backup: ${this.relTime(last)} — consider the 💾 Backup button so a cleared browser can't lose this.`, 'info', 6000), 1200);
+    }
+  }
+
+  deleteSession(id) {
+    try {
+      const sessions = this.loadDeskSessions(true) || {};
+      delete sessions[id];
+      localStorage.setItem(this.SESSIONS_KEY, JSON.stringify(sessions));
+    } catch (e) {}
+    if (!this.currentDoc) this.render();
+  }
+
+  relTime(iso) {
+    try {
+      const ms = Date.now() - new Date(iso).getTime();
+      if (!isFinite(ms) || ms < 45000) return 'just now';
+      const m = Math.round(ms / 60000);
+      if (m < 60) return `${m}m ago`;
+      const h = Math.round(m / 60);
+      if (h < 24) return `${h}h ago`;
+      return `${Math.round(h / 24)}d ago`;
+    } catch (e) { return 'a while ago'; }
+  }
+
+  // Honest status chip: is this reading saved only in this browser, or backed up?
+  syncChipHtml() {
+    if (!this.currentSessionSavedAt) return '';
+    const last = this.loadSyncRecord()?.lastBackupAt;
+    const backedUp = last && new Date(last) >= new Date(this.currentSessionSavedAt);
+    if (backedUp) {
+      return `<span class="chip chip-sync-ok" title="Included in your latest backup file.">🟢 Backed up ${this.relTime(last)}</span>`;
+    }
+    return `<span class="chip chip-sync-warn" title="Saved in this browser only. Use 💾 Backup (or sync to your phone) so a cleared browser or a new device can't lose it.">🟠 This browser only</span>`;
+  }
+
+  renderResumeStrip(sessions) {
+    return `
+      <div class="desk-resume-strip">
+        <div class="resume-strip-header">
+          <span>🕐 Pick up where you left off</span>
+          <span class="resume-sub">saved in this browser</span>
+        </div>
+        <div class="resume-cards">
+          ${sessions.map(s => `
+            <div class="desk-resume-card">
+              <div class="resume-card-top">
+                <span class="doc-type-badge ${String(s.fileType || '').toLowerCase()}">${this.escapeHtml(s.fileType || 'DOC')}</span>
+                <button class="btn-resume-delete" data-resume-delete="${this.escapeHtml(s.id)}" title="Forget this session">✕</button>
+              </div>
+              <p class="resume-filename" title="${this.escapeHtml(s.filename)}">${this.escapeHtml(s.filename)}</p>
+              <p class="resume-meta">${s.totalUnits || 0} ${this.escapeHtml(s.unitLabel || 'pages')} · ${s.analysis ? 'summary ready' : 'not summarized yet'} · ${this.relTime(s.savedAt)}</p>
+              <button class="btn-primary btn-resume-session" data-resume="${this.escapeHtml(s.id)}">Resume ↗</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  exportDeskBackup() {
+    this.flushSession(); // make sure the archive includes the latest state
+    try { ReadingTelemetry.log('desk_backup_exported'); } catch (e) {}
+    SyncManager.downloadFullBackup(SyncManager.buildFullArchive());
+    if (this.currentDoc) this.render(); // chip flips to 🟢 Backed up
+  }
+
   render() {
     if (!this.container) return;
 
@@ -92,6 +283,7 @@ export class DocumentDesk {
     const isUsingDefault = DocumentSummarizer.isUsingDefaultKey();
     const hasGeminiCustom = Boolean(DocumentSummarizer.getGeminiCustomKey());
     const hasOpenAI = prov === 'openai_compat' && Boolean(DocumentSummarizer.getOpenAIKey());
+    const deskSessions = this.loadDeskSessions();
 
     // Managed-deployment rule: the header pill is a call-to-action, not a status.
     // Show it ONLY when the user must do something (no usable key). Otherwise hide.
@@ -157,6 +349,8 @@ export class DocumentDesk {
         </div>
       </div>
 
+      ${deskSessions.length ? this.renderResumeStrip(deskSessions) : ''}
+
       <!-- Processing Modal / Indicator -->
       <div class="reader-loading-overlay" id="reader-loading-overlay" style="display: none;">
         <div class="loading-box">
@@ -193,6 +387,7 @@ export class DocumentDesk {
             <span class="chip">📄 ${doc.totalUnits} ${doc.unitLabel}</span>
             <span class="chip">🔤 ~${wordCount.toLocaleString()} words</span>
             ${engineBadge}
+            ${this.syncChipHtml()}
           </div>
         </div>
 
@@ -231,6 +426,9 @@ export class DocumentDesk {
           `}
           <button class="btn-subtle" id="btn-print-reading-guide" title="Print this study sheet for physical binder">
             🖨️ <span>Print</span>
+          </button>
+          <button class="btn-subtle" id="btn-desk-backup" title="Download a full backup file — restores on any device, and works with the phone app's Backup Downloader">
+            💾 <span>Backup</span>
           </button>
         </div>
       </div>
@@ -1072,6 +1270,18 @@ export class DocumentDesk {
         this.openGeminiModal();
       });
     }
+
+    // Sprint B: resume-strip session cards (upload state)
+    this.container.querySelectorAll('.btn-resume-session').forEach(btn => {
+      btn.addEventListener('click', () => this.resumeSession(btn.dataset.resume));
+    });
+    this.container.querySelectorAll('.btn-resume-delete').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.deleteSession(btn.dataset.resumeDelete);
+        showToast('Session forgotten from this browser.', 'info');
+      });
+    });
   }
 
   bindWorkspaceEvents() {
@@ -1122,6 +1332,11 @@ export class DocumentDesk {
       });
     }
 
+    const btnDeskBackup = document.getElementById('btn-desk-backup');
+    if (btnDeskBackup) {
+      btnDeskBackup.addEventListener('click', () => this.exportDeskBackup());
+    }
+
     // Delegated click handler for interactive citation buttons
     this.container.addEventListener('click', (e) => {
       const jumpBtn = e.target.closest('.citation-jump-btn');
@@ -1142,6 +1357,7 @@ export class DocumentDesk {
     // Fold / Unfold active recall toggle
     const handleToggleFold = () => {
       this.isCornellFolded = !this.isCornellFolded;
+      this.persistSession();
       this.render();
       if (this.isCornellFolded) {
         showToast('🙈 Notes folded! Use the cues on the left to test your active recall.', 'info');
@@ -1422,6 +1638,10 @@ export class DocumentDesk {
       this.currentAnalysis = null;
       this.activeSummaryType = null;
       this.activeSubTab = 'verbatim';
+      this.verbatimVisibleCount = 25;
+      this.currentDocId = this.makeDocId(extractedDoc);
+      this.currentSessionSavedAt = new Date().toISOString();
+      this.persistSession();
       this.hideLoading();
       this.render();
       showToast(`"${extractedDoc.filename}" is loaded — review the source, then choose a summary.`, 'info');
@@ -1456,6 +1676,7 @@ export class DocumentDesk {
 
     this.updateSubtabButtons();
     this.updateWorkspaceActions();
+    this.persistSession();
   }
 
   updateSubtabButtons() {
@@ -1477,6 +1698,7 @@ export class DocumentDesk {
   toggleSplitView() {
     this.isSplitView = !this.isSplitView;
     localStorage.setItem('pedagogo_reader_split_view', String(this.isSplitView));
+    this.persistSession();
 
     const body = document.getElementById('reading-view-body');
     const btn = document.getElementById('btn-toggle-split-view');
@@ -1818,6 +2040,8 @@ export class DocumentDesk {
       this.currentAnalysis = analysis;
       this.activeSummaryType = analysis.source === 'QUICK_LOOK' ? 'quick' : type;
       this.activeSubTab = 'synthesis';
+      this.currentSessionSavedAt = new Date().toISOString();
+      this.persistSession();
       this.hideLoading();
       this.render();
 

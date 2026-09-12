@@ -224,7 +224,8 @@ export class SyncManager {
         showToast(
           `Pedagogo Desk Archive Restored!\n` +
           `• ${summary.flashcards ?? 0} LET Flashcards • ${summary.fieldStudyEntries ?? 0} FS Episodes\n` +
-          `• ${summary.tasks ?? 0} Tasks • ${summary.classrooms ?? 0} Classes • ${summary.subjects ?? 0} Subjects`,
+          `• ${summary.tasks ?? 0} Tasks • ${summary.classrooms ?? 0} Classes • ${summary.subjects ?? 0} Subjects\n` +
+          `• ${summary.readingSessions ?? 0} Reading Desk Sessions`,
           'success',
           5500
         );
@@ -260,6 +261,15 @@ export class SyncManager {
    *  SF2 attendance roll calls, and Phase 3 assessment score sheets).
    */
   exportFullBackup() {
+    SyncManager.downloadFullBackup(SyncManager.buildFullArchive());
+  }
+
+  /**
+   * Sprint B (risk fix): static archive builder so the Reading Desk can offer
+   * "Backup now" without instantiating this class (the constructor inits PeerJS
+   * and the sync-view DOM, which must not happen from the desk).
+   */
+  static buildFullArchive() {
     const parseKey = (key, fallback) => {
       const raw = localStorage.getItem(key);
       if (!raw) return fallback;
@@ -275,6 +285,8 @@ export class SyncManager {
     const fsEntries = parseKey('pedagogo_fs_entries', []);
     const savedLp = parseKey('pedagogo_saved_lp', null);
     const readingHistory = parseKey('pedagogo_reading_history', []);
+    const readingSessions = parseKey('pedagogo_reading_sessions', {});
+    const readingSync = parseKey('pedagogo_reading_sync', null);
     const attendance = parseKey('pedagogo_attendance_sessions', null);
     const assessments = parseKey('pedagogo_assessments', null);
     const planLibrary = parseKey('pedagogo_lp_plans', null);
@@ -309,6 +321,7 @@ export class SyncManager {
         letFlags: Array.isArray(letFlags) ? letFlags.length : 0,
         letLogs: Array.isArray(letLogs) ? letLogs.length : 0,
         anecdotalNotes: Array.isArray(anecRecords) ? anecRecords.length : 0,
+        readingSessions: Object.keys(readingSessions || {}).length,
         hasLessonPlan: !!savedLp
       },
       stores: {
@@ -324,6 +337,8 @@ export class SyncManager {
         pedagogo_fs_entries: fsEntries,
         pedagogo_saved_lp: savedLp,
         pedagogo_reading_history: readingHistory,
+        pedagogo_reading_sessions: readingSessions,
+        pedagogo_reading_sync: readingSync,
         pedagogo_attendance_sessions: attendance,
         pedagogo_assessments: assessments,
         pedagogo_lp_plans: planLibrary,
@@ -333,7 +348,24 @@ export class SyncManager {
       }
     };
 
-    const blob = new Blob([JSON.stringify(fullArchive, null, 2)], { type: 'application/json' });
+    return fullArchive;
+  }
+
+  /**
+   * Downloads the archive file and stamps the reading-sync record so the
+   * Reading Desk status chip can honestly show "backed up" vs "local only".
+   */
+  static downloadFullBackup(archive) {
+    let stampedAt = null;
+    try {
+      const syncRaw = localStorage.getItem('pedagogo_reading_sync');
+      const sync = syncRaw ? JSON.parse(syncRaw) : {};
+      stampedAt = new Date().toISOString();
+      sync.lastBackupAt = stampedAt;
+      localStorage.setItem('pedagogo_reading_sync', JSON.stringify(sync));
+    } catch (e) { /* non-fatal: chip just stays "local only" */ }
+
+    const blob = new Blob([JSON.stringify(archive, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -344,7 +376,8 @@ export class SyncManager {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast('Full system backup archive downloaded safely!', 'success');
-    return fullArchive;
+    window.dispatchEvent(new CustomEvent('pedagogo:backup-exported', { detail: { at: stampedAt } }));
+    return archive;
   }
 
   /**
@@ -418,6 +451,15 @@ export class SyncManager {
       planLibraryCount = 0;
     }
 
+    let readingSessionsCount = 0;
+    try {
+      const rsRaw = localStorage.getItem('pedagogo_reading_sessions');
+      const rs = rsRaw ? JSON.parse(rsRaw) : null;
+      readingSessionsCount = rs && typeof rs === 'object' ? Object.keys(rs).length : 0;
+    } catch {
+      readingSessionsCount = 0;
+    }
+
     this.inventoryStrip.innerHTML = `
       <div class="inventory-header">
         <span>📦 Current In-Browser Data Inventory</span>
@@ -433,6 +475,7 @@ export class SyncManager {
         <span class="inv-pill"><strong>${assessmentCount}</strong> Score Sheets</span>
         <span class="inv-pill"><strong>${countItems('pedagogo_anecdotal_records')}</strong> Anecdotal Notes</span>
         <span class="inv-pill"><strong>${planLibraryCount}</strong> Lesson Plans</span>
+        <span class="inv-pill"><strong>${readingSessionsCount}</strong> Desk Sessions</span>
         <span class="inv-pill"><strong>${subjectsCount}</strong> Subjects</span>
       </div>
     `;
@@ -446,7 +489,7 @@ export class SyncManager {
     }
   }
 
-  getMockSchedule() {
+  static getMockSchedule() {
     return {
       version: 1,
       exportedAt: new Date().toISOString(),
