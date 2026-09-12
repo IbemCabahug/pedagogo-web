@@ -38,6 +38,18 @@ export class DocumentDesk {
 
   renderUploadState() {
     const hasKey = DocumentSummarizer.hasApiKey();
+    const isUsingDefault = DocumentSummarizer.isUsingDefaultKey();
+    const hasCustom = Boolean(DocumentSummarizer.getCustomKey());
+
+    let keyBadgeIcon = '🔑';
+    let keyBadgeText = 'Setup Free Gemini Key';
+    if (hasCustom) {
+      keyBadgeIcon = '🔑';
+      keyBadgeText = 'Custom Key Configured ✓';
+    } else if (isUsingDefault) {
+      keyBadgeIcon = '✨';
+      keyBadgeText = 'Gemini AI Ready (Project Key) ✓';
+    }
 
     this.container.innerHTML = `
       <div class="view-header">
@@ -47,7 +59,7 @@ export class DocumentDesk {
         </div>
         <div class="header-actions">
           <button class="btn-subtle" id="btn-open-gemini-modal">
-            <span>🔑 ${hasKey ? 'Gemini Key Configured ✓' : 'Setup Free Gemini Key'}</span>
+            <span>${keyBadgeIcon} ${keyBadgeText}</span>
           </button>
         </div>
       </div>
@@ -231,7 +243,7 @@ export class DocumentDesk {
 
     // Extract Cues, Synthesis, Notes, Analogies, and Chunks
     let summaryText = 'Distill core ideas from reading into an enduring takeaway.';
-    const sumMatch = md.match(/Macro-Synthesis[^\n:]*:\*\*\s*([^\n]+)/i);
+    const sumMatch = md.match(/(?:TL;DR|Macro-Synthesis)[^\n:]*:\*\*\s*([^\n]+)/i);
     if (sumMatch) summaryText = sumMatch[1];
 
     // Extract Active Recall Cues
@@ -386,9 +398,9 @@ export class DocumentDesk {
       day: 'numeric'
     });
 
-    // Extract Summary
+    // Extract Summary (v1 TL;DR + legacy Macro-Synthesis)
     let summaryText = 'Distill core ideas into an enduring understanding.';
-    const sumMatch = md.match(/Macro-Synthesis[^\n:]*:\*\*\s*([^\n]+)/i);
+    const sumMatch = md.match(/(?:TL;DR|Macro-Synthesis)[^\n:]*:\*\*\s*([^\n]+)/i);
     if (sumMatch) summaryText = sumMatch[1];
 
     // Extract Cues
@@ -562,6 +574,9 @@ export class DocumentDesk {
   simpleMarkdown(text) {
     if (!text) return '';
     return text
+      .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h3>$1</h3>')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/\[((?:Page|Slide|Section|Unit)\s+(\d+)(?::\s*([^\]]+))?|Primary Text Extraction)\]/gi, (match, fullText, num, detail) => {

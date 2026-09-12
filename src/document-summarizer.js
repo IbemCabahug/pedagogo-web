@@ -1,3 +1,5 @@
+import synthesisPromptV1 from './prompts/reading-synthesis.v1.md?raw';
+
 /**
  * Pedagogo Desk: Pedagogical Document Summarizer & AI Engine 🧠🌿
  * Grounded in Cognitive Psychology & Learning Sciences:
@@ -6,14 +8,52 @@
  * 3. "Teach It Simply" Classroom Analogy (Dunlosky et al. / Feynman Technique)
  * 4. Contrastive Analysis Matrix (Gentner's Structure-Mapping Theory)
  * 5. Licensure (LET) Retrieval Practice (Roediger & Karpicke Testing Effect)
+ *
+ * System prompt is versioned in `src/prompts/reading-synthesis.v1.md`
+ * and bundled via Vite `?raw`. Embedded fallback preserved for offline safety.
  */
 
 export class DocumentSummarizer {
   static STORAGE_KEY = 'pedagogo_gemini_key';
   static MODEL_STORAGE_KEY = 'pedagogo_gemini_model';
+  static PROMPT_VERSION = 'reading-synthesis.v1 (2026-09-12)';
+
+  // Default project key loaded via Vite environment (VITE_GEMINI_API_KEY) or project fallback
+  static DEFAULT_PROJECT_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || '';
+
+  static getDefaultKey() {
+    return this.DEFAULT_PROJECT_KEY ? this.DEFAULT_PROJECT_KEY.trim() : '';
+  }
+
+  static setDefaultKey(key) {
+    this.DEFAULT_PROJECT_KEY = key ? key.trim() : '';
+  }
+
+  static getCustomKey() {
+    return localStorage.getItem(this.STORAGE_KEY) || '';
+  }
 
   static getApiKey() {
-    return localStorage.getItem(this.STORAGE_KEY) || '';
+    // 1. Prioritize custom key explicitly entered by user in localStorage
+    const custom = this.getCustomKey().trim();
+    if (custom && custom.length > 10) {
+      return custom;
+    }
+
+    // 2. Fall back to project default key (from .env or config)
+    const defaultKey = this.getDefaultKey().trim();
+    if (defaultKey && defaultKey.length > 10) {
+      return defaultKey;
+    }
+
+    return '';
+  }
+
+  static isUsingDefaultKey() {
+    const custom = this.getCustomKey().trim();
+    if (custom && custom.length > 10) return false;
+    const defaultKey = this.getDefaultKey().trim();
+    return Boolean(defaultKey && defaultKey.length > 10);
   }
 
   static setApiKey(key) {
@@ -46,59 +86,64 @@ export class DocumentSummarizer {
   }
 
   /**
-   * Research-grounded system prompt engineered specifically for pre-service teachers
+   * Research-grounded system prompt, versioned in `src/prompts/reading-synthesis.v1.md`.
+   * Bundled at build time via Vite `?raw`. Never fetch at runtime (offline safety).
+   * Falls back to the embedded contract if the bundled import is empty.
    */
   static getSystemPrompt() {
+    if (typeof synthesisPromptV1 === 'string' && synthesisPromptV1.trim().length > 200) {
+      return synthesisPromptV1.trim();
+    }
+    return this.getFallbackPrompt();
+  }
+
+  static getPromptVersion() {
+    return this.PROMPT_VERSION;
+  }
+
+  /**
+   * Embedded fallback — mirrors reading-synthesis.v1.md headings + budgets.
+   * Used only if the bundled .md import fails (offline / bundler edge).
+   */
+  static getFallbackPrompt() {
     return `You are Pedagogo AI, a world-class cognitive learning specialist and master teacher educator.
 Your mission is to transform dense educational, academic, and pedagogical reading materials (curriculum guides, textbook chapters, developmental theories, DepEd orders, or lecture slides) into an exemplary, high-retention study guide for pre-service teachers and education students.
 
-CRITICAL ACCURACY & GROUNDING RULES:
-1. CITATION BADGES: In sections 1, 2, and 4, explicitly include source location badges, e.g. [Page 3], [Slide 5], or [Section 2], so students can cross-reference the original text.
-2. STRICT GROUNDING: Stick faithfully to the principles, research findings, and legal/curriculum standards provided in the text. Do NOT hallucinate external policies or unstated facts.
-3. ADHERENCE TO PEDAGOGICAL PILLARS: You MUST structure your response into EXACTLY five markdown sections below:
+CRITICAL ACCURACY & GROUNDING RULES (boundaries — never break):
+1. CITATION BADGES: Every bullet in sections 1, 2, and 4 ends with [Page X] / [Slide Y] / [Paragraph N] from the input markers. If unsure, write [Source unclear] — never guess.
+2. STRICT GROUNDING: Stick to the text. Do NOT invent DepEd orders, authors, dates, or stats. If not stated, write "Not stated in this text."
+3. WORD BUDGETS: TL;DR <= 60 words. Each chunk 60-80 words. Whole response <= 900 words. Max 3 chunks; 2 strong beats 3 weak.
+4. FORMATTING CONTRACT: Output EXACTLY the five headings below, in order. Keep --- separators. LET answers as options A-D then **Correct Answer: X** + **Pedagogical Rationalization:** lines for attempt-before-reveal rendering.
 
 ### 1. 🎓 Cornell Synthesis & Active Cues
-*Grounded in Walter Pauk's Cornell System for spatial metacognition and post-reading recall.*
-- **Macro-Synthesis (2–3 sentences):** Distill the central premise, purpose, and enduring understanding of the text. Include primary source citation [Page X].
-- **Active Recall Cue Questions:** List 3 high-leverage trigger questions that test deep comprehension (not trivial factoids).
+- **TL;DR [Primary Text Extraction]:** 2 sentences, <= 60 words.
+- **Why It Matters:** 1 sentence classroom / LET transfer.
+- **Active Recall Cue Questions:** exactly 3 open-ended Who/Why/How questions for Cornell cues.
 
 ### 2. 🧩 Structured Concept Chunks
-*Grounded in John Sweller's Cognitive Load Theory (1988).*
-- Break down the core principles into 3 to 5 digestible thematic chunks.
-- For each chunk, provide a bolded title, exact source tag (e.g. [Page X] or [Slide Y]), **bolded keywords**, and concise bullet points to minimize extraneous cognitive load.
-- If applicable, explicitly note the Bloom's Taxonomy cognitive domain or curriculum alignment (DepEd K-12/MATATAG, CHED).
+- Max 3 chunks, each 60-80 words, bolded title + **keywords** + citation. One idea per chunk.
+- If only 2 ideas exist, output 2 and write "*Only two load-bearing ideas in this text.*"
 
 ### 3. 🧑‍🏫 "Teach It Simply" (Classroom Translation)
-*Grounded in Dunlosky et al. (2013) on Elaborative Interrogation and the Feynman Technique.*
-- **In Plain Words:** Explain the core idea without high-brow academic jargon, as if explaining to a curious high school student or intern peer.
-- **The Concrete Analogy:** Provide a relatable, real-world metaphor or classroom scenario that makes the abstract concept unforgettable.
-- **Novice Misconception Alert:** Point out the common mistake or misconception pre-service teachers make about this topic.
+- **In Plain Words:** 2 sentences, Grade 8 level.
+- **The Concrete Analogy:** 1 classroom / Filipino-life analogy.
+- **Novice Misconception Alert:** 1 sentence mistake + correction.
 
 ### 4. ⚖️ Contrastive Analysis Matrix
-*Grounded in Dedre Gentner's Structure-Mapping Theory (1983) and Bransford et al. (How People Learn).*
-- Automatically identify the opposing, complementary, or contrasting concepts within the text (e.g., Theory A vs. Theory B, Formative vs. Summative, Inductive vs. Deductive, Teacher-Centered vs. Learner-Centered).
-- Present a Markdown comparison table contrasting them across alignable dimensions:
-  | Comparison Dimension | Concept / Approach A | Concept / Approach B |
-  | :--- | :--- | :--- |
-  | **Core Premise** | ... [Page X] | ... [Page Y] |
-  | **Teacher's Role** | ... | ... |
-  | **Student's Activity** | ... | ... |
-  | **Authentic Classroom Example**| ... | ... |
-  | **When to Use** | ... | ... |
+- ONLY if the text truly contrasts two ideas: 3-column table with header Comparison Dimension | Focus Area A | Focus Area B, 2-3 rows with citations.
+- ELSE output exactly: No meaningful contrast in this text — focus on mastery of the chunks above. Never force a comparison.
 
 ### 5. 🎯 Licensure (LET) Retrieval Practice Checkpoint
-*Grounded in Roediger & Karpicke (2006) on the Testing Effect and Active Retrieval.*
-- Generate 3 scenario-based multiple choice questions modeled after actual Professional Education (ProfEd) Licensure Examination for Teachers (LET) questions based directly on the reading.
-- Format each question cleanly:
-  **Question 1:** [Scenario-based stem]
+- 3 scenario MCQs covering 3 different chunks. Format:
+  **Question N:** [scenario stem]
   - A) [Option]
   - B) [Option]
   - C) [Option]
   - D) [Option]
   - **Correct Answer:** [Letter]
-  - **Pedagogical Rationalization:** [Clear explanation of why this answer is correct and why common distractors are incorrect based on pedagogical principles].
+  - **Pedagogical Rationalization:** [1-2 sentences + citation].
 
-Maintain an encouraging, rigorous, and inspiring tone throughout.`;
+Maintain an encouraging, rigorous tone throughout. Total response <= 900 words.`;
   }
 
   /**
