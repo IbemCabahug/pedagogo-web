@@ -21,6 +21,8 @@ export class DocumentDesk {
     this.activeSummaryType = null;   // 'study' | 'quick' | 'reviewer' — Sprint B goal choice
     this.verbatimVisibleCount = 25;  // Sprint B: lazy-render Verbatim to protect school-laptop perf
     this.searchQuery = '';
+    this.verbatimView = 'transcript'; // 'transcript' | 'original' — dual-view Verbatim (research-backed)
+    this.originalObjectUrl = null; // in-memory blob URL for Original view; never persisted
     this.isProcessing = false;
     this.isCornellFolded = false; // "Fold & Test" active recall state
     this.termBankMisses = new Map(); // term -> { meaning, anchor } starred as "couldn't recall"
@@ -133,6 +135,13 @@ export class DocumentDesk {
     try {
       const sessions = this.loadDeskSessions(true) || {};
       const docCopy = Object.assign({}, this.currentDoc);
+      // Never persist live File handles, blob URLs, or heavy render helpers.
+      delete docCopy.sourceFile;
+      delete docCopy.originalObjectUrl;
+      if (docCopy.formattedHtml && docCopy.formattedHtml.length > 200000) {
+        // Keep session restores light; transcript units + rawText always survive.
+        delete docCopy.formattedHtml;
+      }
       if (docCopy.base64Data) {
         // Multimodal bytes are too large for localStorage; resumable text survives.
         docCopy.multimodalAvailable = true;
@@ -149,6 +158,7 @@ export class DocumentDesk {
         analysis: this.currentAnalysis,
         activeSubTab: this.activeSubTab,
         activeSummaryType: this.activeSummaryType,
+        verbatimView: this.verbatimView,
         isSplitView: this.isSplitView,
         isCornellFolded: this.isCornellFolded,
         verbatimVisibleCount: this.verbatimVisibleCount
@@ -188,6 +198,8 @@ export class DocumentDesk {
     this.currentAnalysis = s.analysis || null;
     this.activeSubTab = s.activeSubTab || 'synthesis';
     this.activeSummaryType = s.activeSummaryType || null;
+    this.verbatimView = s.verbatimView === 'original' ? 'original' : 'transcript';
+    this.ensureOriginalObjectUrl();
     this.isSplitView = Boolean(s.isSplitView);
     this.isCornellFolded = Boolean(s.isCornellFolded);
     this.verbatimVisibleCount = s.verbatimVisibleCount || 25;
@@ -446,8 +458,8 @@ export class DocumentDesk {
                 ? 'Analyzed via your Custom AI (' + this.escapeHtml(analysis.modelName || 'OpenAI-compatible') + ')'
                 : (analysis?.source === 'GEMINI_API'
                 ? 'Analyzed via Gemini Flash AI (Default)'
-                : (analysis?.source === 'LOCAL_EXTRACTIVE_NLP'
-                  ? 'Local In-Browser Extractive Synthesis (Basic Mode — connect an AI key for full quality)'
+                : (['LOCAL_EXTRACTIVE_NLP', 'LOCAL_TEXTRANK_ENGINE'].includes(analysis?.source)
+                  ? 'Offline extract — keyword scaffolding, needs AI key for accuracy'
                   : 'Built-in Educational Sample (Basic Offline Mode — quality limited without an AI key)')))})
             </span>
             <span class="synthesis-frameworks-badge">
@@ -455,7 +467,7 @@ export class DocumentDesk {
                 ? '✓ TL;DR ✓ Key Points ✓ Citations ✓ Study Next'
                 : '✓ Cornell Notes ✓ Cognitive Chunking ✓ Feynman Analogy ✓ Contrastive Matrix ✓ LET Practice'}
             </span>
-            ${analysis?.source === 'LOCAL_EXTRACTIVE_NLP' && !DocumentSummarizer.hasApiKey() ? `
+            ${['LOCAL_EXTRACTIVE_NLP', 'LOCAL_TEXTRANK_ENGINE'].includes(analysis?.source) && !DocumentSummarizer.hasApiKey() ? `
               <button class="btn-subtle" id="btn-upgrade-gemini-pill" style="margin-left: auto; font-size: 11.5px; padding: 3px 10px;">
                 ⚡ <span>Connect Free Gemini Key for Generative AI</span>
               </button>
@@ -490,6 +502,17 @@ export class DocumentDesk {
           <!-- Jump Return Banner Slot -->
           <div id="verbatim-jump-banner-slot"></div>
 
+          <!-- Dual-view switcher: Transcript (study) vs Original (visual truth) -->
+          <div class="verbatim-view-toggle" role="tablist" aria-label="Verbatim view">
+            <button type="button" role="tab" aria-selected="${this.verbatimView !== 'original'}" class="verbatim-view-btn ${this.verbatimView !== 'original' ? 'active' : ''}" data-verbatim-view="transcript" title="Searchable word-for-word text with copy and citation jumps">📖 Transcript</button>
+            <button type="button" role="tab" aria-selected="${this.verbatimView === 'original'}" class="verbatim-view-btn ${this.verbatimView === 'original' ? 'active' : ''}" data-verbatim-view="original" title="Original file layout, read-only">🖼️ Original</button>
+          </div>
+
+          ${this.verbatimView === 'original' ? `
+          <!-- Original View -->
+          <div class="verbatim-original" id="verbatim-original">
+            ${this.renderOriginalView(doc)}
+          </div>` : `
           <!-- Search & Unit Filter Toolbar -->
           <div class="verbatim-toolbar">
             <div class="verbatim-search-box">
@@ -506,7 +529,7 @@ export class DocumentDesk {
           <!-- Verbatim Text Stream -->
           <div class="verbatim-stream" id="verbatim-stream">
             ${this.renderVerbatimUnits(doc)}
-          </div>
+          </div>`}
         </div>
       </div>
     `;
@@ -1146,7 +1169,22 @@ export class DocumentDesk {
     const firstStart = rows[0].start;
     const lastEnd = rows[rows.length - 1].end;
 
-    const beforeMarkdown = sectionRaw.slice(0, firstStart).trim();
+    // Trust fix: beforeMarkdown still contained the "### 2." heading, the
+    // Part A intro, and the raw "| Term | In-Text Meaning ..." header +
+    // "| :--- |" separator lines. simpleMarkdown() has no table handling, so
+    // those leaked as visible pipe-garbage + a duplicate heading inside the
+    // card. Strip them before rendering.
+    const beforeMarkdown = sectionRaw.slice(0, firstStart)
+      .split('\n')
+      .filter(l => {
+        const t = l.trim();
+        if (!t) return false;
+        if (/^###?\s*\d/.test(t)) return false;
+        if (/^\|/.test(t)) return false;
+        return true;
+      })
+      .join('\n')
+      .trim();
     const afterMarkdown = sectionRaw.slice(lastEnd).trim();
 
     const termRowsHtml = rows.map((t, i) => {
@@ -1187,6 +1225,16 @@ export class DocumentDesk {
   renderVerbatimUnits(doc) {
     const query = this.searchQuery.toLowerCase().trim();
     const allUnits = doc.units || [];
+
+    // Trust fix: empty parse (TXT/DOCX with no sections) showed a blank panel
+    // with zero feedback. Surface an actionable empty state instead.
+    if (allUnits.length === 0) {
+      return `<div class="verbatim-empty-state">
+        <div class="verbatim-empty-icon">📄</div>
+        <p class="verbatim-empty-title">No extractable text found in this file</p>
+        <p class="verbatim-empty-desc">The parser could not detect any readable sections. If this is an image-only scan, switch to 🖼️ Original above — or re-upload as a text-based <strong>.docx</strong> / searchable PDF.</p>
+      </div>`;
+    }
 
     // Sprint B: lazy-render. Search bypasses pagination; otherwise render up to the visible count.
     const maxShown = query ? allUnits.length : Math.max(1, this.verbatimVisibleCount || 25);
@@ -1303,6 +1351,8 @@ export class DocumentDesk {
         this.currentDoc = null;
         this.currentAnalysis = null;
         this.searchQuery = '';
+        this.verbatimView = 'transcript';
+        this.revokeOriginalObjectUrl();
         this.render();
       });
     }
@@ -1324,6 +1374,11 @@ export class DocumentDesk {
         this.switchSubTab('verbatim');
       });
     }
+
+    // Dual-view Verbatim toggle (delegated: buttons re-render with the panel)
+    this.container.querySelectorAll('[data-verbatim-view]').forEach(btn => {
+      btn.addEventListener('click', () => this.setVerbatimView(btn.dataset.verbatimView));
+    });
 
     const btnToggleSplit = document.getElementById('btn-toggle-split-view');
     if (btnToggleSplit) {
@@ -1613,6 +1668,151 @@ export class DocumentDesk {
     });
   }
 
+  setVerbatimView(view) {
+    this.verbatimView = view === 'original' ? 'original' : 'transcript';
+    this.ensureOriginalObjectUrl();
+    this.persistSession();
+    this.render();
+  }
+
+  revokeOriginalObjectUrl() {
+    try {
+      if (this.originalObjectUrl) URL.revokeObjectURL(this.originalObjectUrl);
+    } catch (e) {}
+    this.originalObjectUrl = null;
+  }
+
+  ensureOriginalObjectUrl() {
+    try {
+      if (this.originalObjectUrl) return this.originalObjectUrl;
+      const doc = this.currentDoc;
+      if (!doc) return null;
+      if (doc.originalObjectUrl) { this.originalObjectUrl = doc.originalObjectUrl; return this.originalObjectUrl; }
+      const src = doc.sourceFile;
+      if (this.isPreviewableBlobType(doc) && typeof URL !== 'undefined' && URL.createObjectURL && src) {
+        this.originalObjectUrl = URL.createObjectURL(src);
+        doc.originalObjectUrl = this.originalObjectUrl;
+        return this.originalObjectUrl;
+      }
+      if (this.isPreviewableBlobType(doc) && doc.base64Data && typeof URL !== 'undefined' && URL.createObjectURL) {
+        const bin = atob(doc.base64Data);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const blob = new Blob([bytes], { type: doc.mimeType || this.mimeForType(doc.fileType) });
+        this.originalObjectUrl = URL.createObjectURL(blob);
+        doc.originalObjectUrl = this.originalObjectUrl;
+        return this.originalObjectUrl;
+      }
+      return null;
+    } catch (e) { return null; }
+  }
+
+  isPreviewableBlobType(doc) {
+    const t = String(doc?.fileType || '').toUpperCase();
+    return t === 'PDF' || t === 'IMAGE' || t === 'TXT' || t === 'MARKDOWN';
+  }
+
+  mimeForType(fileType) {
+    const t = String(fileType || '').toUpperCase();
+    if (t === 'PDF') return 'application/pdf';
+    if (t === 'TXT' || t === 'MARKDOWN') return 'text/plain';
+    if (t === 'IMAGE') return 'image/*';
+    return 'application/octet-stream';
+  }
+
+  hasOriginalContent(doc) {
+    if (!doc) return false;
+    const t = String(doc.fileType || '').toUpperCase();
+    if (t === 'PDF' || t === 'IMAGE' || t === 'TXT' || t === 'MARKDOWN') {
+      return Boolean(this.ensureOriginalObjectUrl());
+    }
+    if (t === 'DOCX') return Boolean((doc.formattedHtml || '').trim());
+    if (t === 'PPTX') return Boolean((doc.units || []).length);
+    return false;
+  }
+
+  renderOriginalView(doc) {
+    const t = String(doc.fileType || '').toUpperCase();
+    const url = this.ensureOriginalObjectUrl();
+    if (t === 'PDF') {
+      if (!url) return this.renderOriginalMissing(doc);
+      return `<div class="original-frame-wrap">
+        <iframe class="original-frame" title="Original PDF" src="${url}" loading="lazy"></iframe>
+        <p class="original-hint">Original layout, read-only. Search, copy, and citation jumps live in Transcript.</p>
+      </div>`;
+    }
+    if (t === 'IMAGE') {
+      const src = url || (doc.base64Data ? `data:${doc.mimeType || 'image/jpeg'};base64,${doc.base64Data}` : null);
+      if (!src) return this.renderOriginalMissing(doc);
+      return `<div class="original-image-wrap">
+        <img class="original-image" src="${src}" alt="Original">
+        <p class="original-hint">Original visual, as uploaded.</p>
+      </div>`;
+    }
+    if (t === 'TXT' || t === 'MARKDOWN') {
+      if (!url) return this.renderOriginalMissing(doc);
+      return `<div class="original-frame-wrap">
+        <iframe class="original-frame original-text-frame" title="Original text" src="${url}" loading="lazy"></iframe>
+        <p class="original-hint">Original plain text, untouched.</p>
+      </div>`;
+    }
+    if (t === 'DOCX') return this.renderOriginalDocx(doc);
+    if (t === 'PPTX') return this.renderOriginalSlides(doc);
+    return this.renderOriginalMissing(doc);
+  }
+
+  renderOriginalMissing(doc) {
+    return `<div class="original-empty">
+      <p><strong>Original isn't available in this restored session.</strong></p>
+      <p class="original-hint">Previews live in memory only for privacy — re-upload to see the original again. Transcript + summary are intact.</p>
+      <button type="button" class="btn-subtle" data-verbatim-view="transcript">Back to Transcript</button>
+    </div>`;
+  }
+
+  sanitizeDocxHtml(html) {
+    try {
+      const tpl = document.createElement('template');
+      tpl.innerHTML = String(html || '');
+      tpl.content.querySelectorAll('script, style, iframe, object, embed, form, link, meta').forEach(n => n.remove());
+      return tpl.innerHTML;
+    } catch (e) { return ''; }
+  }
+
+  renderOriginalSlides(doc) {
+    const slides = (doc.units || []).map(u => this.renderOriginalSlideCard(u)).join('');
+    if (!slides.trim()) return this.renderOriginalMissing(doc);
+    return `<div class="original-slides" tabindex="0">${slides}
+      <p class="original-hint">Slide order, titles, bullets and speaker notes preserved; transitions and backgrounds dropped for study clarity.</p>
+    </div>`;
+  }
+
+  renderOriginalSlideCard(u) {
+    const raw = String(u.text || '');
+    const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+    const titleLine = lines.find(l => l.startsWith('**') && l.endsWith('**'));
+    const title = titleLine ? titleLine.replace(/^\*\*|\*\*$/g, '') : (u.title || `Slide ${u.unitNumber}`);
+    const bullets = lines.filter(l => l.startsWith('•')).map(l => l.replace(/^•\s*/, ''));
+    const noteLine = lines.find(l => /^\*?\[Speaker Note\]/i.test(l));
+    const note = noteLine ? noteLine.replace(/^\*?\[Speaker Note\]\*?:?\s*/i, '') : '';
+    const isVisual = /visual content \/ diagram slide/i.test(raw);
+    const body = bullets.length
+      ? `<ul class="original-slide-bullets">${bullets.map(b => `<li>${this.escapeHtml(b)}</li>`).join('')}</ul>`
+      : (isVisual ? `<p class="original-slide-visual">Visual / diagram slide — see the uploaded deck for graphics.</p>` : '');
+    return `<article class="original-slide-card">
+      <header class="original-slide-head"><span class="original-slide-num">Slide ${u.unitNumber}</span><h4>${this.escapeHtml(title)}</h4></header>
+      ${body}
+      ${note ? `<p class="original-slide-note"><span>Speaker note:</span> ${this.escapeHtml(note)}</p>` : ''}
+    </article>`;
+  }
+
+  renderOriginalDocx(doc) {
+    const clean = this.sanitizeDocxHtml(doc.formattedHtml || '');
+    if (!clean.trim()) return this.renderOriginalMissing(doc);
+    return `<div class="original-docx" tabindex="0">${clean}
+      <p class="original-hint">Formatted view — headings, tables and emphasis preserved; pagination may differ from Word.</p>
+    </div>`;
+  }
+
   async processUploadedFile(file) {
     this.showLoading('Extracting Document Text...', `Reading ${file.name} word-for-word in browser...`);
 
@@ -1639,6 +1839,11 @@ export class DocumentDesk {
       this.activeSummaryType = null;
       this.activeSubTab = 'verbatim';
       this.verbatimVisibleCount = 25;
+      // Research rule: transcript default when text exists; auto-Original when visual-only.
+      const hasText = cleanContent && cleanContent.length >= 10;
+      this.verbatimView = hasText ? 'transcript' : 'original';
+      this.revokeOriginalObjectUrl();
+      this.ensureOriginalObjectUrl();
       this.currentDocId = this.makeDocId(extractedDoc);
       this.currentSessionSavedAt = new Date().toISOString();
       this.persistSession();
@@ -1753,6 +1958,13 @@ export class DocumentDesk {
 
   jumpToUnit(unitNum, unitType = 'Page', detail = '') {
     if (!this.currentDoc) return;
+
+    // Citation verification always lands on searchable Transcript, never Original.
+    if (this.verbatimView === 'original') {
+      this.verbatimView = 'transcript';
+      this.persistSession();
+      this.render();
+    }
 
     if (this.isSplitView) {
       this.ensureUnitCardVisible(unitNum);
@@ -1987,21 +2199,30 @@ export class DocumentDesk {
       </div>`;
 
     modal.classList.add('active');
-    const closeModal = () => {
+    // Trust fix: "Not now / X / backdrop / Escape" must land on readable
+    // source — never on an empty Synthesis/Cornell panel.
+    const landOnVerbatim = () => {
+      this.activeSubTab = 'verbatim';
+      try { this.persistSession(); } catch (e) {}
+      try { this.render(); } catch (e) { try { this.switchSubTab('verbatim'); } catch (e2) {} }
+      showToast('File kept in 📖 Verbatim — pick Synthesis when ready.', 'info');
+    };
+    const closeModal = (withLanding = false) => {
       modal.classList.remove('active');
       modal.innerHTML = '';
+      if (withLanding) landOnVerbatim();
     };
     const closeHandler = modal.querySelector('#btn-close-summary-chooser');
     if (closeHandler) closeHandler.replaceWith(closeHandler.cloneNode(true));
-    modal.querySelector('#btn-close-summary-chooser')?.addEventListener('click', closeModal);
+    modal.querySelector('#btn-close-summary-chooser')?.addEventListener('click', () => closeModal(true));
     const cancelHandler = modal.querySelector('#btn-cancel-summary-chooser');
     if (cancelHandler) cancelHandler.replaceWith(cancelHandler.cloneNode(true));
     modal.querySelector('#btn-cancel-summary-chooser')?.addEventListener('click', () => {
       try { ReadingTelemetry.log('summary_dialog_aborted'); } catch (e) {}
-      closeModal();
+      closeModal(true);
     });
-    modal.onclick = (e) => { if (e.target === modal) closeModal(); };
-    modal.onkeydown = (e) => { if (e.key === 'Escape') closeModal(); };
+    modal.onclick = (e) => { if (e.target === modal) closeModal(true); };
+    modal.onkeydown = (e) => { if (e.key === 'Escape') closeModal(true); };
     const firstBtn = modal.querySelector('#btn-close-summary-chooser');
     if (firstBtn) { try { firstBtn.focus({ preventScroll: true }); } catch (e) {} }
     modal.querySelectorAll('.summary-type-card').forEach(card => {
@@ -2065,7 +2286,12 @@ export class DocumentDesk {
       } else if (analysis.source === 'GEMINI_API') {
         showToast(`✨ "${name}" synthesized via Gemini Flash AI (Default)!`, 'success');
       } else {
-        showToast(`🌱 Analyzed "${name}" from its actual text!`, 'info');
+        // Trust fix: honest offline label — the old "from its actual text"
+        // hid that TextRank scaffolding is lower quality than AI.
+        const needsKey = !DocumentSummarizer.hasApiKey();
+        showToast(needsKey
+          ? `📝 Offline extract for "${name}" — connect a free Gemini key for full accuracy.`
+          : `📝 Offline extract for "${name}" — Gemini unreachable, verify against Verbatim.`, 'info');
       }
 
       if ((analysis.source === 'GEMINI_API' || analysis.source === 'OPENAI_COMPAT_API') && DocumentSummarizer.shouldSuggestPro(this.currentDoc)) {

@@ -24,23 +24,41 @@ export class DocumentParser {
   static async parseFile(file) {
     const filename = file.name;
     const extension = filename.split('.').pop().toLowerCase();
+    // Keep a File reference so the desk can build an in-memory blob URL for
+    // the "Original" view. Blob URLs are session-only (never persisted).
+    const sourceFile = (typeof File !== 'undefined' && file instanceof File) ? file : null;
     const arrayBuffer = await file.arrayBuffer();
 
     switch (extension) {
-      case 'pdf':
-        return await this.parsePdf(arrayBuffer, filename);
-      case 'docx':
-        return await this.parseDocx(arrayBuffer, filename);
-      case 'pptx':
-        return await this.parsePptx(arrayBuffer, filename);
+      case 'pdf': {
+        const doc = await this.parsePdf(arrayBuffer, filename);
+        if (sourceFile) doc.sourceFile = sourceFile;
+        return doc;
+      }
+      case 'docx': {
+        const doc = await this.parseDocx(arrayBuffer, filename);
+        if (sourceFile) doc.sourceFile = sourceFile;
+        return doc;
+      }
+      case 'pptx': {
+        const doc = await this.parsePptx(arrayBuffer, filename);
+        if (sourceFile) doc.sourceFile = sourceFile;
+        return doc;
+      }
       case 'txt':
-      case 'md':
-        return await this.parsePlainText(file, filename);
+      case 'md': {
+        const doc = await this.parsePlainText(file, filename);
+        if (sourceFile) doc.sourceFile = sourceFile;
+        return doc;
+      }
       case 'png':
       case 'jpg':
       case 'jpeg':
-      case 'webp':
-        return await this.parseImage(file, filename);
+      case 'webp': {
+        const doc = await this.parseImage(file, filename);
+        if (sourceFile) doc.sourceFile = sourceFile;
+        return doc;
+      }
       default:
         throw new Error(`Unsupported file format (.${extension}). Please upload a .pdf, .docx, .pptx, .txt, or image document.`);
     }
@@ -278,6 +296,7 @@ export class DocumentParser {
       // Mammoth HTML conversion preserves headings and tables
       const htmlResult = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer.slice(0) });
       const html = htmlResult.value || '';
+      const formattedHtml = htmlResult.value || '';
 
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
@@ -352,6 +371,7 @@ export class DocumentParser {
         totalUnits: units.length,
         unitLabel: 'Sections',
         rawText: fullMarkdown.trim(),
+        formattedHtml,
         units
       };
     } catch (err) {

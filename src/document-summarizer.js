@@ -102,7 +102,7 @@ export class DocumentSummarizer {
   static getActiveProviderLabel() {
     return this.getProvider() === 'openai_compat'
       ? ('OpenAI-Compatible (' + this.getOpenAIModel() + ')')
-      : ('Gemini 2.0 (' + this.getSelectedModel() + ')');
+      : ('Gemini (' + this.getSelectedModel() + ')');
   }
 
   static getCustomKey() {
@@ -155,27 +155,46 @@ export class DocumentSummarizer {
     return Boolean(key && key.length > 10);
   }
 
-  // Sprint A.5 — Gemini 2.5 Flash is the default (2.0 retired per Google 2026-09 docs).
-  // 2.0/1.5 kept as silent fallbacks in summarize()'s retry chain, not in the dropdown.
+  // Sprint A.5 (2026-09-13 refresh) — Gemini 2.x/1.5 retired per Google (404:
+  // "gemini-2.5-flash is no longer available for new users, use gemini-3.6-flash").
+  // Defaults now target the 3.x Flash family on v1beta generateContent.
+  static DEFAULT_MODEL = 'gemini-3.6-flash';
+
   static getAvailableModels() {
     return [
-      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Recommended)', desc: 'Best balance: 1M context, stronger reasoning than 2.0, still fast + free tier' },
-      { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash-Lite (Fastest)', desc: 'Cheapest/fastest; good for short readings on school WiFi' },
-      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Deep Reasoner)', desc: 'Slowest; use for dense theory / curriculum orders only' }
+      { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash (Recommended)', desc: 'Best balance: speed + multimodal, current stable Flash family' },
+      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (Most Intelligent)', desc: 'Strongest reasoning; use for dense theory / curriculum orders' },
+      { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash (Legacy-Fast)', desc: 'Baseline speed for routine short readings / school WiFi' }
     ];
   }
 
-  // Silent fallback chain for models removed from the dropdown (never shown in UI).
+  // Silent fallback chain (never shown in UI). `gemini-flash-latest` alias
+  // hot-swaps to the newest Flash so a future retirement self-heals.
   static getLegacyFallbackModels() {
-    return ['gemini-2.0-flash', 'gemini-1.5-flash'];
+    return ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
   }
 
   static getSelectedModel() {
     const stored = (() => { try { return localStorage.getItem(this.MODEL_STORAGE_KEY) || ''; } catch { return ''; } })();
     const valid = this.getAvailableModels().map(m => m.id);
-    // Migrate stale stored values (e.g. 2.0/1.5) to the new default.
+    // Migrate stale stored values (e.g. 2.x/1.5) to the new default.
     if (stored && valid.includes(stored)) return stored;
-    return 'gemini-2.5-flash';
+    try { localStorage.removeItem(this.MODEL_STORAGE_KEY); } catch {}
+    return this.DEFAULT_MODEL;
+  }
+
+  /**
+   * Sprint A.6 — Gemini auth helper: new AI Studio auth keys (AQ....)
+   * must travel in the `x-goog-api-key` header, not `?key=` query param.
+   * Header form works for BOTH legacy AIza keys and new AQ auth keys,
+   * and keeps the key out of the URL (logs / history).
+   */
+  static getGeminiHeaders(apiKey) {
+    return { 'Content-Type': 'application/json', 'x-goog-api-key': (apiKey || '').trim() };
+  }
+
+  static buildGeminiEndpoint(modelId) {
+    return `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`;
   }
 
   /**
@@ -183,16 +202,16 @@ export class DocumentSummarizer {
    * Gemini request before saving, so students get instant success/failure.
    * Returns { ok: true, model } or { ok: false, message }.
    */
-  static async testApiKey(apiKey, modelId = 'gemini-2.5-flash') {
+  static async testApiKey(apiKey, modelId = this.DEFAULT_MODEL) {
     const key = (apiKey || '').trim();
     if (!key || key.length < 10) {
       return { ok: false, message: 'That key looks too short — paste the full key from AI Studio.' };
     }
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`;
+    const endpoint = this.buildGeminiEndpoint(modelId);
     try {
       const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getGeminiHeaders(key),
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: 'Reply with the single word: ok' }] }],
           generationConfig: { temperature: 0, maxOutputTokens: 8 }
@@ -280,7 +299,7 @@ export class DocumentSummarizer {
 
 
   static setSelectedModel(modelId) {
-    localStorage.setItem(this.MODEL_STORAGE_KEY, modelId || 'gemini-2.5-flash');
+    localStorage.setItem(this.MODEL_STORAGE_KEY, modelId || this.DEFAULT_MODEL);
   }
 
   /**
@@ -477,11 +496,11 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
 
     // Try primary model, then fallback if needed
     for (const model of modelsToTry) {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const endpoint = this.buildGeminiEndpoint(model);
       try {
         const response = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: this.getGeminiHeaders(apiKey),
           body: JSON.stringify(promptPayload)
         });
 
@@ -540,11 +559,11 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
       generationConfig: { temperature: 0.15, topP: 0.9, topK: 32, maxOutputTokens: maxTokens || 8192 }
     };
     for (const model of modelsToTry) {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const endpoint = this.buildGeminiEndpoint(model);
       try {
         const response = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: this.getGeminiHeaders(apiKey),
           body: JSON.stringify(payload)
         });
         if (!response.ok) continue;
@@ -883,8 +902,13 @@ Section 3: Child Protection Committee (CPC). Every elementary and secondary scho
     const definitionRegex = /(?:([A-Z][a-zA-Z\s]{2,30})\s+(?:is defined as|refers to|can be described as|means|is characterized by)\s+([^.;]{15,180}))/gi;
 
     for (const s of sentences) {
+      // Trust fix: /g regexes keep lastIndex across sentences — without a
+      // reset the second sentence starts mid-pattern and every later match
+      // is silently skipped, so definitionMatches stayed empty (generic
+      // filler terms). Fresh regex per sentence.
+      const freshDefinitionRegex = new RegExp(definitionRegex.source, definitionRegex.flags);
       let match;
-      while ((match = definitionRegex.exec(s)) !== null) {
+      while ((match = freshDefinitionRegex.exec(s)) !== null) {
         if (match[1] && match[2]) {
           definitionMatches.push({
             term: match[1].trim(),
@@ -901,8 +925,10 @@ Section 3: Child Protection Committee (CPC). Every elementary and secondary scho
     const contrastRegex = /(?:([^,.;]{10,80})\s+(?:whereas|unlike|in contrast to|on the other hand|as opposed to|while)\s+([^,.;]{10,80}))/gi;
 
     for (const s of sentences) {
+      // Trust fix: same /g lastIndex trap as the definition loop above.
+      const freshContrastRegex = new RegExp(contrastRegex.source, contrastRegex.flags);
       let match;
-      while ((match = contrastRegex.exec(s)) !== null) {
+      while ((match = freshContrastRegex.exec(s)) !== null) {
         if (match[1] && match[2]) {
           contrastMatches.push({
             partA: match[1].trim(),
