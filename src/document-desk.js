@@ -363,16 +363,11 @@ export class DocumentDesk {
 
       ${deskSessions.length ? this.renderResumeStrip(deskSessions) : ''}
 
-      <!-- Processing Modal / Indicator -->
-      <div class="reader-loading-overlay" id="reader-loading-overlay" style="display: none;">
-        <div class="loading-box">
-          <div class="loading-spinner"></div>
-          <h4 id="loading-status-title">Reading Document...</h4>
-          <p id="loading-status-desc">Extracting word-for-word text page by page...</p>
-          <p class="loading-elapsed" id="loading-status-elapsed" hidden></p>
-          <button type="button" class="btn-subtle loading-cancel" id="loading-cancel-btn" hidden>✕ Cancel</button>
-        </div>
-      </div>
+      <!-- Processing overlay moved out of this template (2026-09-13 root-cause fix):
+           it used to live here and was destroyed by renderActiveWorkspace()'s
+           innerHTML swap, so showLoading() silently no-op'd during AI synthesis
+           (the reported "plain white, then text appears" bug). It is now a
+           body-level lazy singleton — see ensureLoadingOverlay(). -->
     `;
 
     this.bindUploadEvents();
@@ -2113,8 +2108,36 @@ export class DocumentDesk {
     this.render();
   }
 
+  /**
+   * Sprint UX fix — the loading overlay must exist on EVERY screen and survive
+   * re-renders. Previously it was part of the upload-screen template, so clicking
+   * Summarize on the workspace screen found no #reader-loading-overlay in the DOM
+   * and showLoading()/updateLoadingDesc() silently did nothing (the reported
+   * "plain white, then text appears" bug). Body-level singleton, same pattern
+   * as the summary-chooser modal.
+   */
+  ensureLoadingOverlay() {
+    let overlay = document.getElementById('reader-loading-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'reader-loading-overlay';
+      overlay.className = 'reader-loading-overlay';
+      overlay.style.display = 'none';
+      overlay.innerHTML = `
+        <div class="loading-box">
+          <div class="loading-spinner"></div>
+          <h4 id="loading-status-title">Working…</h4>
+          <p id="loading-status-desc"></p>
+          <p class="loading-elapsed" id="loading-status-elapsed" hidden></p>
+          <button type="button" class="btn-subtle loading-cancel" id="loading-cancel-btn" hidden>✕ Cancel</button>
+        </div>`;
+      document.body.appendChild(overlay);
+    }
+    return overlay;
+  }
+
   showLoading(title, desc, opts = {}) {
-    const overlay = document.getElementById('reader-loading-overlay');
+    const overlay = this.ensureLoadingOverlay();
     const tEl = document.getElementById('loading-status-title');
     const dEl = document.getElementById('loading-status-desc');
     if (tEl) tEl.textContent = title;
