@@ -16,6 +16,10 @@ import synthesisPromptV1 from './prompts/reading-synthesis.v1.md?raw';
 export class DocumentSummarizer {
   static STORAGE_KEY = 'pedagogo_gemini_key';
   static MODEL_STORAGE_KEY = 'pedagogo_gemini_model';
+  static PROVIDER_STORAGE_KEY = 'pedagogo_ai_provider';
+  static OPENAI_KEY_STORAGE_KEY = 'pedagogo_openai_key';
+  static OPENAI_BASE_STORAGE_KEY = 'pedagogo_openai_base_url';
+  static OPENAI_MODEL_STORAGE_KEY = 'pedagogo_openai_model';
   static PROMPT_VERSION = 'reading-synthesis.v1 (2026-09-12)';
 
   // Default project key loaded via Vite environment (VITE_GEMINI_API_KEY) or project fallback
@@ -29,13 +33,91 @@ export class DocumentSummarizer {
     this.DEFAULT_PROJECT_KEY = key ? key.trim() : '';
   }
 
+  static getProvider() {
+    try {
+      const v = (localStorage.getItem(this.PROVIDER_STORAGE_KEY) || 'gemini').trim();
+      return v === 'openai_compat' ? 'openai_compat' : 'gemini';
+    } catch { return 'gemini'; }
+  }
+
+  static setProvider(pid) {
+    try { localStorage.setItem(this.PROVIDER_STORAGE_KEY, pid === 'openai_compat' ? 'openai_compat' : 'gemini'); } catch {}
+  }
+
+  static getGeminiCustomKey() {
+    try { return localStorage.getItem(this.STORAGE_KEY) || ''; } catch { return ''; }
+  }
+
+  static getOpenAIKey() {
+    try { return localStorage.getItem(this.OPENAI_KEY_STORAGE_KEY) || ''; } catch { return ''; }
+  }
+
+  static setOpenAIKey(key) {
+    try {
+      if (key && key.trim()) localStorage.setItem(this.OPENAI_KEY_STORAGE_KEY, key.trim());
+      else localStorage.removeItem(this.OPENAI_KEY_STORAGE_KEY);
+    } catch {}
+  }
+
+  static getOpenAIBaseUrl() {
+    try {
+      const v = (localStorage.getItem(this.OPENAI_BASE_STORAGE_KEY) || 'https://api.openai.com/v1').trim().replace(/\/$/, '');
+      return v || 'https://api.openai.com/v1';
+    } catch { return 'https://api.openai.com/v1'; }
+  }
+
+  static setOpenAIBaseUrl(url) {
+    try {
+      const clean = (url || '').trim().replace(/\/$/, '');
+      if (clean) localStorage.setItem(this.OPENAI_BASE_STORAGE_KEY, clean);
+      else localStorage.removeItem(this.OPENAI_BASE_STORAGE_KEY);
+    } catch {}
+  }
+
+  static getOpenAIModel() {
+    try { return (localStorage.getItem(this.OPENAI_MODEL_STORAGE_KEY) || 'gpt-4o-mini').trim() || 'gpt-4o-mini'; }
+    catch { return 'gpt-4o-mini'; }
+  }
+
+  static setOpenAIModel(model) {
+    try {
+      if (model && model.trim()) localStorage.setItem(this.OPENAI_MODEL_STORAGE_KEY, model.trim());
+      else localStorage.removeItem(this.OPENAI_MODEL_STORAGE_KEY);
+    } catch {}
+  }
+
+  static getOpenAIPresets() {
+    return [
+      { baseUrl: 'https://api.stepfun.com/v1', name: 'StepFun (Step 3.7 Flash)', model: 'step-3.7-flash' },
+      { baseUrl: 'https://api.openai.com/v1', name: 'OpenAI', model: 'gpt-4o-mini' },
+      { baseUrl: 'https://api.groq.com/openai/v1', name: 'Groq', model: 'llama-3.3-70b-versatile' },
+      { baseUrl: 'https://openrouter.ai/api/v1', name: 'OpenRouter', model: 'meta-llama/llama-3.3-70b-instruct' },
+      { baseUrl: 'https://api.deepseek.com/v1', name: 'DeepSeek', model: 'deepseek-chat' },
+      { baseUrl: 'http://localhost:11434/v1', name: 'Ollama (local)', model: 'llama3.1' },
+      { baseUrl: 'http://localhost:1234/v1', name: 'LM Studio (local)', model: 'local-model' }
+    ];
+  }
+
+  static getActiveProviderLabel() {
+    return this.getProvider() === 'openai_compat'
+      ? ('OpenAI-Compatible (' + this.getOpenAIModel() + ')')
+      : ('Gemini 2.0 (' + this.getSelectedModel() + ')');
+  }
+
   static getCustomKey() {
-    return localStorage.getItem(this.STORAGE_KEY) || '';
+    // Legacy accessor: active provider's custom key (keeps old call sites working).
+    if (this.getProvider() === 'openai_compat') return this.getOpenAIKey();
+    return this.getGeminiCustomKey();
   }
 
   static getApiKey() {
+    // OpenAI-compatible slot uses its own key only (never the Gemini project key).
+    if (this.getProvider() === 'openai_compat') {
+      const k = this.getOpenAIKey().trim();
+      return (k && k.length > 8) ? k : '';
+    }
     // 1. Prioritize custom key explicitly entered by user in localStorage
-    const custom = this.getCustomKey().trim();
+    const custom = this.getGeminiCustomKey().trim();
     if (custom && custom.length > 10) {
       return custom;
     }
@@ -50,39 +132,154 @@ export class DocumentSummarizer {
   }
 
   static isUsingDefaultKey() {
-    const custom = this.getCustomKey().trim();
+    if (this.getProvider() === 'openai_compat') return false;
+    const custom = this.getGeminiCustomKey().trim();
     if (custom && custom.length > 10) return false;
     const defaultKey = this.getDefaultKey().trim();
     return Boolean(defaultKey && defaultKey.length > 10);
   }
 
   static setApiKey(key) {
-    if (key) {
-      localStorage.setItem(this.STORAGE_KEY, key.trim());
-    } else {
-      localStorage.removeItem(this.STORAGE_KEY);
-    }
+    // Legacy accessor writes to the ACTIVE provider slot.
+    if (this.getProvider() === 'openai_compat') { this.setOpenAIKey(key); return; }
+    try {
+      if (key) localStorage.setItem(this.STORAGE_KEY, key.trim());
+      else localStorage.removeItem(this.STORAGE_KEY);
+    } catch {}
   }
 
   static hasApiKey() {
     const key = this.getApiKey();
+    if (this.getProvider() === 'openai_compat') return Boolean(key && key.length > 8);
     return Boolean(key && key.length > 10);
   }
 
+  // Sprint A.5 — Gemini 2.5 Flash is the default (2.0 retired per Google 2026-09 docs).
+  // 2.0/1.5 kept as silent fallbacks in summarize()'s retry chain, not in the dropdown.
   static getAvailableModels() {
     return [
-      { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Recommended)', desc: 'Next-gen multimodal, native PDF reading, high accuracy & speed' },
-      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Legacy)', desc: 'Fast, lightweight and stable extraction' },
-      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Deep Reasoner)', desc: 'Maximum analytical depth for complex theories & curriculum orders' }
+      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Recommended)', desc: 'Best balance: 1M context, stronger reasoning than 2.0, still fast + free tier' },
+      { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash-Lite (Fastest)', desc: 'Cheapest/fastest; good for short readings on school WiFi' },
+      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Deep Reasoner)', desc: 'Slowest; use for dense theory / curriculum orders only' }
     ];
   }
 
-  static getSelectedModel() {
-    return localStorage.getItem(this.MODEL_STORAGE_KEY) || 'gemini-2.0-flash';
+  // Silent fallback chain for models removed from the dropdown (never shown in UI).
+  static getLegacyFallbackModels() {
+    return ['gemini-2.0-flash', 'gemini-1.5-flash'];
   }
 
+  static getSelectedModel() {
+    const stored = (() => { try { return localStorage.getItem(this.MODEL_STORAGE_KEY) || ''; } catch { return ''; } })();
+    const valid = this.getAvailableModels().map(m => m.id);
+    // Migrate stale stored values (e.g. 2.0/1.5) to the new default.
+    if (stored && valid.includes(stored)) return stored;
+    return 'gemini-2.5-flash';
+  }
+
+  /**
+   * Sprint A — in-app BYOK test call: verifies a pasted key with a tiny
+   * Gemini request before saving, so students get instant success/failure.
+   * Returns { ok: true, model } or { ok: false, message }.
+   */
+  static async testApiKey(apiKey, modelId = 'gemini-2.5-flash') {
+    const key = (apiKey || '').trim();
+    if (!key || key.length < 10) {
+      return { ok: false, message: 'That key looks too short — paste the full key from AI Studio.' };
+    }
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`;
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: 'Reply with the single word: ok' }] }],
+          generationConfig: { temperature: 0, maxOutputTokens: 8 }
+        })
+      });
+      if (res.ok) return { ok: true, model: modelId };
+      const errJson = await res.json().catch(() => ({}));
+      const msg = errJson?.error?.message || `HTTP ${res.status}`;
+      return { ok: false, message: msg };
+    } catch (err) {
+      return { ok: false, message: (err && err.message) || 'Network error — check connection and retry.' };
+    }
+  }
+
+  // --- OpenAI-compatible chat path (BYOK slot) ---
+  static async testOpenAIKey(apiKey, baseUrl, model) {
+    const key = (apiKey || '').trim();
+    const base = (baseUrl || '').trim().replace(/\/$/, '');
+    const mdl = (model || '').trim();
+    if (!key || key.length < 8) return { ok: false, message: 'That key looks too short.' };
+    if (!base || !/^https?:\/\//i.test(base)) return { ok: false, message: 'Base URL must start with http(s)://' };
+    if (!mdl) return { ok: false, message: 'Enter a model name.' };
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 25000);
+    try {
+      const resp = await fetch(base + '/chat/completions', {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+        body: JSON.stringify({
+          model: mdl,
+          messages: [{ role: 'user', content: 'Reply with the single word: ok' }],
+          max_tokens: 8,
+          temperature: 0
+        })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        const msg = (data && data.error && data.error.message) ? data.error.message : ('HTTP ' + resp.status);
+        return { ok: false, message: String(msg).slice(0, 220) };
+      }
+      const text = (((data.choices || [])[0] || {}).message || {}).content || '';
+      if (!text.trim()) return { ok: false, message: 'Connected, but got an empty reply. Check the model name.' };
+      return { ok: true, model: mdl };
+    } catch (err) {
+      if (err && err.name === 'AbortError') return { ok: false, message: 'Timed out. Check the base URL (local server running?) and retry.' };
+      return { ok: false, message: 'Network error: ' + String((err && err.message) || err).slice(0, 160) };
+    } finally { clearTimeout(timer); }
+  }
+
+  static async completeWithOpenAI(prompt, opts) {
+    // Sprint A.5: StepFun step-* models accept `reasoning_effort` (low/medium/high).
+    // Default 'medium' = recommended general reasoning; ignored by non-StepFun endpoints.
+    const maxTokens = (opts && opts.maxTokens) || 8192;
+    const reasoningEffort = (opts && opts.reasoningEffort) || 'medium';
+    const base = this.getOpenAIBaseUrl();
+    const key = this.getOpenAIKey().trim();
+    const mdl = this.getOpenAIModel();
+    const resp = await fetch(base + '/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify((() => {
+        const payload = {
+          model: mdl,
+          messages: [
+            { role: 'system', content: 'You are an expert instructional designer for Philippine teacher education (DepEd/CHED-aligned).' },
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: maxTokens,
+          temperature: 0.2
+        };
+        if (/^step-/i.test(mdl)) payload.reasoning_effort = reasoningEffort;
+        return payload;
+      })())
+    });
+    const data = await resp.json().catch(() => { throw new Error('Invalid JSON from AI endpoint (HTTP ' + resp.status + ')'); });
+    if (!resp.ok) {
+      const msg = (data && data.error && data.error.message) ? data.error.message : ('HTTP ' + resp.status);
+      throw new Error(String(msg).slice(0, 300));
+    }
+    const text = (((data.choices || [])[0] || {}).message || {}).content || '';
+    if (!text.trim()) throw new Error('AI returned an empty response. Try again or switch model.');
+    return text;
+  }
+
+
   static setSelectedModel(modelId) {
-    localStorage.setItem(this.MODEL_STORAGE_KEY, modelId || 'gemini-2.0-flash');
+    localStorage.setItem(this.MODEL_STORAGE_KEY, modelId || 'gemini-2.5-flash');
   }
 
   /**
@@ -155,9 +352,35 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
 
   /**
    * Run pedagogical analysis on extracted text or native multimodal document.
+
+
    * If no key is set, runs our client-side TextRank extractive NLP engine in-browser.
    */
+  // Sprint A.5 helper: long/dense docs where Pro is worth suggesting (toast only, never auto-switch).
+  static shouldSuggestPro(extractedDoc) {
+    try {
+      const chars = (extractedDoc && extractedDoc.rawText ? extractedDoc.rawText.length : 0)
+        || ((extractedDoc && extractedDoc.units) || []).reduce((s, u) => s + ((u && u.text) || '').length, 0);
+      const units = (extractedDoc && extractedDoc.totalUnits) || ((extractedDoc && extractedDoc.units) || []).length || 0;
+      return chars > 130000 || units > 200;
+    } catch { return false; }
+  }
+
   static async summarize(extractedDoc) {
+    // OpenAI-compatible BYOK slot: same synthesis prompt, chat-completions transport.
+    if (this.getProvider() === 'openai_compat') {
+      const oKey = this.getOpenAIKey().trim();
+      if (!oKey) {
+        if (extractedDoc.filename && (extractedDoc.filename.toLowerCase().includes('sample') || extractedDoc.filename.toLowerCase().includes('piaget'))) {
+          return this.generateFallbackAnalysis(extractedDoc);
+        }
+        return this.extractPedagogicalAnalysis(extractedDoc);
+      }
+      const oModel = this.getOpenAIModel();
+      const oPrompt = this.getSystemPrompt() + "\n\nHere is the educational reading material to analyze:\n**Document Title:** " + extractedDoc.filename + " (" + extractedDoc.fileType + ")\n**Total Units:** " + extractedDoc.totalUnits + " " + extractedDoc.unitLabel + "\n\n**Verbatim Document Content:**\n" + extractedDoc.rawText.slice(0, 120000);
+      const synthesis = await this.completeWithOpenAI(oPrompt, { maxTokens: 8192 });
+      return { source: 'OPENAI_COMPAT_API', modelName: oModel, markdown: synthesis, analyzedAt: new Date().toISOString() };
+    }
     const apiKey = this.getApiKey();
 
     // If no key is set:
@@ -169,10 +392,8 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
     }
 
     const selectedModel = this.getSelectedModel();
-    const modelsToTry = [selectedModel];
-    if (selectedModel !== 'gemini-1.5-flash') {
-      modelsToTry.push('gemini-1.5-flash');
-    }
+    // Sprint A.5: selected model first, then silent legacy fallbacks (2.0/1.5).
+    const modelsToTry = [selectedModel, ...this.getLegacyFallbackModels().filter(m => m !== selectedModel)];
 
     // Build prompt payload: check if multimodal inline document is available (PDF or Image)
     const canUseMultimodal = Boolean(extractedDoc.base64Data && (extractedDoc.fileType === 'PDF' || extractedDoc.fileType === 'IMAGE'));
@@ -202,8 +423,9 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
     const promptPayload = {
       contents: [{ role: 'user', parts }],
       generationConfig: {
-        temperature: 0.2, // Lower temperature for high factual accuracy
-        topP: 0.95,
+        temperature: 0.15, // Low + stable: factual, on-format, low hallucination for study sheets
+        topP: 0.9, // Slightly focused nucleus sampling: fewer off-format drifts, analogy still fresh
+        topK: 32, // Constrain wild token choices on long docs without flattening the analogy
         maxOutputTokens: 8192
       }
     };

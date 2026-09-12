@@ -3880,6 +3880,62 @@ body.dark-mode .citation-target-pulse {
   }
 }
 
+/* Sprint A — Reading Desk trust + density (ground-truth guard, collapsibles, counter) */
+.ground-truth-guard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #FFF8E6;
+  border: 1.5px solid #D98326;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.guard-icon { font-size: 20px; }
+.guard-body { flex: 1 1 220px; font-size: 12.5px; line-height: 1.45; color: var(--text-main); display: flex; flex-direction: column; gap: 2px; }
+.guard-body span { color: var(--text-muted); font-size: 12px; }
+.guard-actions { display: flex; gap: 6px; }
+.guard-dismiss { opacity: 0.75; }
+.verify-counter-line {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface-subtle);
+  border: 1px dashed var(--border-light);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: 10px 0 0;
+}
+.card-collapsible { padding: 0; overflow: hidden; }
+.card-collapsible .card-summary-header {
+  cursor: pointer;
+  padding: 14px 18px;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+}
+.card-collapsible .card-summary-header::-webkit-details-marker { display: none; }
+.card-collapsible .card-summary-header::before { content: '+'; font-weight: 800; opacity: 0.6; }
+.card-collapsible[open] .card-summary-header::before { content: '\2013'; }
+.card-collapsible .card-body-content { padding: 0 18px 16px; }
+.retrieval-header-bar .card-summary-header { padding: 0; }
+.gemini-key-row { display: flex; gap: 8px; align-items: center; }
+.gemini-key-row .form-input { flex: 1; }
+/* Multi-provider AI tabs (Gemini default + Custom OpenAI-compatible) */
+.ai-provider-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.ai-provider-tab { flex: 1; border: 1px solid var(--border-light); background: var(--surface-subtle); color: var(--text-main); border-radius: var(--radius-sm); padding: 9px 10px; font-weight: 700; font-size: 13px; cursor: pointer; }
+.ai-provider-tab.active { border-color: var(--sage-primary); background: rgba(74, 124, 89, 0.12); }
+.ai-pane { display: block; }
+.gemini-test-status { font-size: 12.5px; margin-top: 6px; min-height: 18px; color: var(--text-muted); }
+.gemini-test-status[data-kind="ok"] { color: var(--sage-primary); font-weight: 700; }
+.gemini-test-status[data-kind="fail"] { color: #C0392B; font-weight: 600; }
+.gemini-test-status[data-kind="pending"] { color: var(--text-muted); font-style: italic; }
+.gemini-test-status[data-kind="warn"] { color: #B7791F; font-weight: 600; }
+body.dark-mode .ground-truth-guard { background: rgba(217, 131, 38, 0.12); border-color: rgba(217, 131, 38, 0.5); }
+
 /* Gemini Setup Modal */
 .gemini-modal-card {
   max-width: 540px;

@@ -7,6 +7,7 @@
 import { DocumentParser } from './document-parser.js';
 import { DocumentSummarizer } from './document-summarizer.js';
 import { showToast } from './toast.js';
+import { ReadingTelemetry } from './reading-telemetry.js';
 
 export class DocumentDesk {
   constructor() {
@@ -20,11 +21,58 @@ export class DocumentDesk {
     this.isSplitView = localStorage.getItem('pedagogo_reader_split_view') === 'true';
     this.originSubTab = 'synthesis';
     this.originScrollY = 0;
+    this.citationTapCount = 0; // Sprint A telemetry: taps this session
+    this.groundTruthDismissed = sessionStorage.getItem('pedagogo_guard_dismissed') === '1';
 
     this.container = document.getElementById('view-reading-desk');
     if (this.container) {
+      this.claimInviteKey();
       this.render();
     }
+  }
+
+  // Sprint A.5 — magic invite link: pedagogo.html?key=AIza... (or #key=...)
+  // Claims once into localStorage, strips the param so the key never lingers
+  // in history/screenshots, then re-renders so the badge flips to Ready.
+  claimInviteKey() {
+    try {
+      const url = new URL(window.location.href);
+      let k = (url.searchParams.get('key') || '').trim();
+      if (!k && window.location.hash) {
+        const m = window.location.hash.match(/key=([^&]+)/);
+        if (m) k = decodeURIComponent(m[1]).trim();
+      }
+      const forcedBasic = url.searchParams.get('basic') === '1';
+      if (forcedBasic) { try { sessionStorage.setItem('pedagogo_force_basic', '1'); } catch (e) {} }
+      if (!k || k.length < 10) return false;
+      // Provider-pack format: "stepfun:BASE|MODEL|KEY" or plain Gemini key.
+      if (k.startsWith('stepfun:')) {
+        const parts = k.slice('stepfun:'.length).split('|');
+        if (parts.length === 3) {
+          DocumentSummarizer.setProvider('openai_compat');
+          DocumentSummarizer.setOpenAIBaseUrl(parts[0] || 'https://api.stepfun.com/v1');
+          DocumentSummarizer.setOpenAIModel(parts[1] || 'step-3.7-flash');
+          DocumentSummarizer.setOpenAIKey(parts[2]);
+        }
+      } else if (k.startsWith('openai_compat:')) {
+        const parts = k.slice('openai_compat:'.length).split('|');
+        if (parts.length === 3) {
+          DocumentSummarizer.setProvider('openai_compat');
+          DocumentSummarizer.setOpenAIBaseUrl(parts[0]);
+          DocumentSummarizer.setOpenAIModel(parts[1]);
+          DocumentSummarizer.setOpenAIKey(parts[2]);
+        }
+      } else {
+        DocumentSummarizer.setProvider('gemini');
+        try { localStorage.setItem(DocumentSummarizer.STORAGE_KEY, k); } catch (e) {}
+      }
+      try { ReadingTelemetry.log('invite_key_claimed'); } catch (e) {}
+      url.searchParams.delete('key');
+      url.searchParams.delete('basic');
+      window.history.replaceState({}, document.title, url.pathname + url.search + url.hash.replace(/key=[^&]+&?/, ''));
+      try { showToast('AI is ready — just drop a file to start.', 'success'); } catch (e) {}
+      return true;
+    } catch (e) { return false; }
   }
 
   render() {
@@ -38,18 +86,24 @@ export class DocumentDesk {
   }
 
   renderUploadState() {
-    const hasKey = DocumentSummarizer.hasApiKey();
+    const prov = DocumentSummarizer.getProvider();
     const isUsingDefault = DocumentSummarizer.isUsingDefaultKey();
-    const hasCustom = Boolean(DocumentSummarizer.getCustomKey());
+    const hasGeminiCustom = Boolean(DocumentSummarizer.getGeminiCustomKey());
+    const hasOpenAI = prov === 'openai_compat' && Boolean(DocumentSummarizer.getOpenAIKey());
 
-    let keyBadgeIcon = '🔑';
-    let keyBadgeText = 'Setup Free Gemini Key';
-    if (hasCustom) {
+    // Managed-deployment rule: the header pill is a call-to-action, not a status.
+    // Show it ONLY when the user must do something (no usable key). Otherwise hide.
+    let showKeyPill = false;
+    let keyBadgeIcon = '';
+    let keyBadgeText = '';
+    if (prov === 'openai_compat' && !hasOpenAI) {
+      showKeyPill = true;
+      keyBadgeIcon = '🔌';
+      keyBadgeText = 'Connect Your AI Key';
+    } else if (prov !== 'openai_compat' && !DocumentSummarizer.hasApiKey()) {
+      showKeyPill = true;
       keyBadgeIcon = '🔑';
-      keyBadgeText = 'Custom Key Configured ✓';
-    } else if (isUsingDefault) {
-      keyBadgeIcon = '✨';
-      keyBadgeText = 'Gemini AI Ready (Project Key) ✓';
+      keyBadgeText = 'Setup Free Gemini Key';
     }
 
     this.container.innerHTML = `
@@ -59,9 +113,10 @@ export class DocumentDesk {
           <p class="section-desc">Upload course readings, DepEd orders, or slide decks to extract verbatim text and generate research-backed Cornell study sheets.</p>
         </div>
         <div class="header-actions">
+          ${showKeyPill ? `
           <button class="btn-subtle" id="btn-open-gemini-modal">
             <span>${keyBadgeIcon} ${keyBadgeText}</span>
-          </button>
+          </button>` : ''}
         </div>
       </div>
 
@@ -118,7 +173,7 @@ export class DocumentDesk {
     const analysis = this.currentAnalysis;
     const wordCount = doc.rawText.split(/\s+/).filter(Boolean).length;
     const engineBadge = analysis?.modelName 
-      ? `<span class="chip chip-engine" title="Analyzed with ${this.escapeHtml(analysis.modelName)}">${analysis.source === 'GEMINI_API' ? '✨ ' : '⚡ '}${this.escapeHtml(analysis.modelName)}${analysis.isMultimodal ? ' (Multimodal)' : ''}</span>`
+      ? `<span class="chip chip-engine" title="Analyzed with ${this.escapeHtml(analysis.modelName)}">${analysis.source === 'GEMINI_API' ? '✨ ' : (analysis.source === 'OPENAI_COMPAT_API' ? '🔌 ' : '⚡ ')}${this.escapeHtml(analysis.modelName)}${analysis.isMultimodal ? ' (Multimodal)' : ''}</span>`
       : '';
 
     this.container.innerHTML = `
@@ -181,21 +236,36 @@ export class DocumentDesk {
         <div class="synthesis-panel" id="synthesis-panel" style="${(this.activeSubTab === 'synthesis' || (this.isSplitView && this.activeSubTab !== 'cornell')) ? 'display: block;' : 'display: none;'}">
           <div class="synthesis-meta-strip">
             <span class="synthesis-source-tag">
-              🌱 ${analysis?.source === 'GEMINI_API' 
-                ? 'Analyzed via Gemini Flash AI' 
-                : (analysis?.source === 'LOCAL_EXTRACTIVE_NLP' 
-                  ? 'Local In-Browser Extractive Synthesis (From Your Document)' 
-                  : 'Built-in Educational Sample')}
+              🌱 ${analysis?.source === 'OPENAI_COMPAT_API'
+                ? 'Analyzed via your Custom AI (' + this.escapeHtml(analysis.modelName || 'OpenAI-compatible') + ')'
+                : (analysis?.source === 'GEMINI_API'
+                ? 'Analyzed via Gemini Flash AI (Default)'
+                : (analysis?.source === 'LOCAL_EXTRACTIVE_NLP'
+                  ? 'Local In-Browser Extractive Synthesis (Basic Mode — connect an AI key for full quality)'
+                  : 'Built-in Educational Sample (Basic Offline Mode — quality limited without an AI key)'))}
             </span>
             <span class="synthesis-frameworks-badge">
               ✓ Cornell Notes • ✓ Cognitive Chunking • ✓ Feynman Analogy • ✓ Contrastive Matrix • ✓ LET Practice
             </span>
-            ${analysis?.source === 'LOCAL_EXTRACTIVE_NLP' ? `
+            ${analysis?.source === 'LOCAL_EXTRACTIVE_NLP' && !DocumentSummarizer.hasApiKey() ? `
               <button class="btn-subtle" id="btn-upgrade-gemini-pill" style="margin-left: auto; font-size: 11.5px; padding: 3px 10px;">
                 ⚡ <span>Connect Free Gemini Key for Generative AI</span>
               </button>
             ` : ''}
           </div>
+          ${this.groundTruthDismissed ? '' : `
+          <div class="ground-truth-guard" id="ground-truth-guard" role="alert">
+            <div class="guard-icon">🔍</div>
+            <div class="guard-body">
+              <strong>Before you trust this — tap one citation to verify it.</strong>
+              <span>AI can sound confident even when wrong. One tap on [Page X] jumps to the exact words in your file.</span>
+            </div>
+            <div class="guard-actions">
+              <button class="btn-subtle" id="btn-guard-verify">Verify a claim now</button>
+              <button class="btn-subtle guard-dismiss" id="btn-guard-dismiss" aria-label="Dismiss">Dismiss</button>
+            </div>
+          </div>
+          `}
           <div class="synthesis-content-render" id="synthesis-rendered-area">
             ${this.renderSynthesisMarkdown(analysis?.markdown || '')}
           </div>
@@ -540,32 +610,35 @@ export class DocumentDesk {
 
     // Headings to rich cards
     html = html.replace(/### (1\. 🎓 Cornell Synthesis[\s\S]*?)(?=### 2\.|$)/, (m, c) => {
-      return `<div class="pedagogical-card card-cornell"><h3 class="card-header-cornell">1. 🎓 Cornell Synthesis &amp; Active Cues</h3><div class="card-body-content">${this.simpleMarkdown(c.replace('1. 🎓 Cornell Synthesis & Active Cues', ''))}</div></div>`;
+      return `<div class="pedagogical-card card-cornell card-open-default"><h3 class="card-header-cornell">1. 🎓 Cornell Synthesis &amp; Active Cues</h3><div class="card-body-content">${this.simpleMarkdown(c.replace('1. 🎓 Cornell Synthesis & Active Cues', ''))}</div></div>`;
     });
 
     html = html.replace(/### (2\. 🧩 Structured Concept Chunks[\s\S]*?)(?=### 3\.|$)/, (m, c) => {
-      return `<div class="pedagogical-card card-chunks"><h3 class="card-header-chunks">2. 🧩 Structured Concept Chunks</h3><div class="card-body-content">${this.renderTermBankSection(c.replace('2. 🧩 Structured Concept Chunks', ''), md)}</div></div>`;
+      return `<details class="pedagogical-card card-chunks card-collapsible" open><summary class="card-summary-header card-header-chunks">2. 🧩 Structured Concept Chunks</summary><div class="card-body-content">${this.renderTermBankSection(c.replace('2. 🧩 Structured Concept Chunks', ''), md)}</div></details>`;
     });
 
     html = html.replace(/### (3\. 🧑‍🏫 "Teach It Simply"[\s\S]*?)(?=### 4\.|$)/, (m, c) => {
-      return `<div class="pedagogical-card card-feynman"><h3 class="card-header-feynman">3. 🧑‍🏫 "Teach It Simply" (Classroom Analogy)</h3><div class="card-body-content">${this.simpleMarkdown(c.replace('3. 🧑‍🏫 "Teach It Simply" (Classroom Translation)', ''))}</div></div>`;
+      return `<details class="pedagogical-card card-feynman card-collapsible"><summary class="card-summary-header card-header-feynman">3. 🧑‍🏫 "Teach It Simply" (Classroom Analogy)</summary><div class="card-body-content">${this.simpleMarkdown(c.replace('3. 🧑‍🏫 "Teach It Simply" (Classroom Translation)', ''))}</div></details>`;
     });
 
     html = html.replace(/### (4\. ⚖️ Contrastive Analysis Matrix[\s\S]*?)(?=### 5\.|$)/, (m, c) => {
-      return `<div class="pedagogical-card card-contrastive"><h3 class="card-header-contrastive">4. ⚖️ Contrastive Analysis Matrix</h3><div class="card-body-content">${this.simpleMarkdown(c.replace('4. ⚖️ Contrastive Analysis Matrix', ''))}</div></div>`;
+      return `<details class="pedagogical-card card-contrastive card-collapsible"><summary class="card-summary-header card-header-contrastive">4. ⚖️ Contrastive Analysis Matrix</summary><div class="card-body-content">${this.simpleMarkdown(c.replace('4. ⚖️ Contrastive Analysis Matrix', ''))}</div></details>`;
     });
 
     html = html.replace(/### (5\. 🎯 Licensure[\s\S]*?)$/, (m, c) => {
       return `
-        <div class="pedagogical-card card-retrieval">
-          <div class="retrieval-header-bar">
-            <h3 class="card-header-retrieval">5. 🎯 Licensure (LET) Retrieval Practice</h3>
+        <details class="pedagogical-card card-retrieval card-collapsible" open>
+          <summary class="card-summary-header card-header-retrieval">5. 🎯 Licensure (LET) Retrieval Practice</summary>
             <button class="btn-primary btn-save-questions-to-reviewer" id="btn-save-questions-to-reviewer" title="Save MCQs + term drills to your LET reviewer deck (spaced 1d / 3d / 7d)">
               <span>➕ Save to LET Reviewer</span>
+            <span class="retrieval-save-hint">Save drills to LET Reviewer below</span>
+            <button class="btn-primary btn-save-questions-to-reviewer" id="btn-save-questions-to-reviewer" title="Save MCQs + term drills to your LET reviewer deck (spaced 1d / 3d / 7d)">
+              <span>Save to LET Reviewer</span>
             </button>
-          </div>
+          </summary>
           <div class="card-body-content retrieval-body">${this.renderInteractiveQuiz(c)}</div>
-        </div>
+          <p class="verify-counter-line" id="cite-verify-counter" aria-live="polite">No claim verified yet - tap a [Page X] badge to check one.</p>
+        </details>
       `;
     });
 
@@ -1037,6 +1110,10 @@ export class DocumentDesk {
         const targetUnit = parseInt(jumpBtn.dataset.targetUnit, 10);
         const unitType = jumpBtn.dataset.unitType || 'Page';
         const detail = jumpBtn.dataset.detail || '';
+        this.citationTapCount = (this.citationTapCount || 0) + 1;
+        try { ReadingTelemetry.log('citation_tap'); } catch (e) {}
+        this.updateCitationCounter();
+        this.dismissGroundTruthGuard(true);
         this.jumpToUnit(targetUnit, unitType, detail);
       }
     });
@@ -1229,6 +1306,20 @@ export class DocumentDesk {
 
     // Upgrade Gemini pill
     const btnUpgradeGemini = document.getElementById('btn-upgrade-gemini-pill');
+    const btnGuardVerify = document.getElementById('btn-guard-verify');
+    if (btnGuardVerify) {
+      btnGuardVerify.addEventListener('click', () => {
+        try { ReadingTelemetry.log('guard_verify_click'); } catch (e) {}
+        const firstCite = document.querySelector('.citation-jump-btn');
+        if (firstCite) { firstCite.click(); } else { this.switchSubTab('verbatim'); showToast('No citation found — compare the top claim against the Verbatim text word-for-word.', 'info'); }
+      });
+    }
+    const btnGuardDismiss = document.getElementById('btn-guard-dismiss');
+    if (btnGuardDismiss) {
+      btnGuardDismiss.addEventListener('click', () => this.dismissGroundTruthGuard());
+    }
+    this.updateCitationCounter();
+
     if (btnUpgradeGemini) {
       btnUpgradeGemini.addEventListener('click', () => {
         this.openGeminiModal();
@@ -1270,7 +1361,15 @@ export class DocumentDesk {
 
       this.updateLoadingDesc('Running 5-Part Pedagogical Synthesis (Cornell, Chunks, Feynman, Matrix, LET)...');
 
-      const analysis = await DocumentSummarizer.summarize(extractedDoc);
+      let forceBasic = false;
+      try { forceBasic = sessionStorage.getItem('pedagogo_force_basic') === '1'; } catch (e) {}
+      let analysis;
+      if (forceBasic) {
+        analysis = await DocumentSummarizer.extractPedagogicalAnalysis(extractedDoc);
+        analysis.source = 'LOCAL_EXTRACTIVE_NLP';
+      } else {
+        analysis = await DocumentSummarizer.summarize(extractedDoc);
+      }
       
       this.currentDoc = extractedDoc;
       this.currentAnalysis = analysis;
@@ -1279,9 +1378,15 @@ export class DocumentDesk {
       this.render();
 
       if (analysis.source === 'LOCAL_EXTRACTIVE_NLP') {
-        showToast(`🌱 Analyzed "${extractedDoc.filename}" from its actual text! (Connect free Gemini key anytime for generative AI synthesis)`, 'info');
+        showToast(`🌱 Analyzed "${extractedDoc.filename}" from its actual text! (Connect an AI key anytime for generative synthesis)`, 'info');
+      } else if (analysis.source === 'OPENAI_COMPAT_API') {
+        showToast(`🔌 "${extractedDoc.filename}" synthesized via your Custom AI (${analysis.modelName})!`, 'success');
       } else if (analysis.source === 'GEMINI_API') {
-        showToast(`✨ Document "${extractedDoc.filename}" synthesized via Gemini Flash AI!`, 'success');
+        showToast(`✨ Document "${extractedDoc.filename}" synthesized via Gemini Flash AI (Default)!`, 'success');
+      if ((analysis.source === 'GEMINI_API' || analysis.source === 'OPENAI_COMPAT_API') && DocumentSummarizer.shouldSuggestPro(extractedDoc)) {
+        try { ReadingTelemetry.log('pro_nudge_shown'); } catch (e) {}
+        setTimeout(() => showToast('Long/dense file — for deeper reasoning, retry with Gemini 2.5 Pro in AI Settings.', 'info'), 2500);
+      }
       } else {
         showToast(`Document "${extractedDoc.filename}" loaded successfully!`, 'success');
       }
@@ -1367,6 +1472,23 @@ export class DocumentDesk {
 
     this.updateSubtabButtons();
     this.updateWorkspaceActions();
+  }
+
+  updateCitationCounter() {
+    const el = document.getElementById('cite-verify-counter');
+    if (el) {
+      const n = this.citationTapCount || 0;
+      el.textContent = n === 0 ? 'No claim verified yet — tap a [Page X] badge to check one.' : `Verified ${n} claim${n === 1 ? '' : 's'} this session — nice, keep going.`;
+    }
+  }
+
+  dismissGroundTruthGuard(silent = false) {
+    if (this.groundTruthDismissed && !silent) return;
+    this.groundTruthDismissed = true;
+    try { sessionStorage.setItem('pedagogo_guard_dismissed', '1'); } catch (e) {}
+    if (!silent) { try { ReadingTelemetry.log('guard_dismiss'); } catch (e) {} }
+    const g = document.getElementById('ground-truth-guard');
+    if (g) g.style.display = 'none';
   }
 
   jumpToUnit(unitNum, unitType = 'Page', detail = '') {
@@ -1535,22 +1657,33 @@ export class DocumentDesk {
       document.body.appendChild(modal);
     }
 
-    const currentKey = DocumentSummarizer.getApiKey();
+    const activeProvider = DocumentSummarizer.getProvider();
+    const geminiKey = DocumentSummarizer.getGeminiCustomKey();
     const currentModel = DocumentSummarizer.getSelectedModel();
     const availableModels = DocumentSummarizer.getAvailableModels();
+    const openAIKey = DocumentSummarizer.getOpenAIKey();
+    const openAIBase = DocumentSummarizer.getOpenAIBaseUrl();
+    const openAIModel = DocumentSummarizer.getOpenAIModel();
+    const openAIPresets = DocumentSummarizer.getOpenAIPresets();
 
     modal.innerHTML = `
       <div class="modal-card gemini-modal-card">
         <div class="modal-header">
           <div class="modal-title-wrap">
             <span class="modal-icon">🔑</span>
-            <h3>Google Gemini AI Setup &amp; Model Selection</h3>
+            <h3>AI Setup — Default Gemini 2.0 + Your Own Key</h3>
           </div>
           <button class="modal-close" id="btn-close-gemini-modal">✕</button>
         </div>
         <div class="modal-body">
-          <p class="gemini-modal-desc">
-            Generate research-backed, high-retention pedagogical study sheets for your own documents at <strong>$0.00 cost</strong> using Google Gemini.
+          <div class="ai-provider-tabs" role="tablist" aria-label="AI provider">
+            <button type="button" class="ai-provider-tab${activeProvider === 'gemini' ? ' active' : ''}" data-provider="gemini" role="tab" aria-selected="${activeProvider === 'gemini' ? 'true' : 'false'}">✨ Gemini 2.0 (Default)</button>
+            <button type="button" class="ai-provider-tab${activeProvider === 'openai_compat' ? ' active' : ''}" data-provider="openai_compat" role="tab" aria-selected="${activeProvider === 'openai_compat' ? 'true' : 'false'}">🔌 Custom AI Key</button>
+          </div>
+          <p class="gemini-modal-desc" id="ai-modal-desc">
+            ${activeProvider === 'openai_compat'
+              ? 'Use your own OpenAI-compatible key (OpenAI, Groq, OpenRouter, DeepSeek, or a local server). Same study sheets, your endpoint.'
+              : 'Generate research-backed study sheets at <strong>$0.00 cost</strong> with the built-in Gemini 2.0 default — or switch to your own key anytime.'}
           </p>
 
           <div class="gemini-steps-card">
@@ -1566,8 +1699,9 @@ export class DocumentDesk {
             </div>
           </div>
 
+          <div class="ai-pane" id="ai-pane-gemini" style="${activeProvider === 'gemini' ? '' : 'display:none;'}">
           <div class="form-group">
-            <label for="gemini-model-select">Active AI Model Tier:</label>
+            <label for="gemini-model-select">Gemini Model Tier (Default):</label>
             <select id="gemini-model-select" class="form-input form-select" style="font-weight: 600; cursor: pointer;">
               ${availableModels.map(m => `
                 <option value="${m.id}" ${m.id === currentModel ? 'selected' : ''}>
@@ -1579,16 +1713,50 @@ export class DocumentDesk {
           </div>
 
           <div class="form-group">
-            <label for="gemini-api-key-input">Your Gemini API Key:</label>
-            <input type="password" id="gemini-api-key-input" class="form-input" placeholder="AIzaSy..." value="${this.escapeHtml(currentKey)}">
-            <span class="input-hint">Your key is never sent to our servers. All requests go directly from your browser to Google's API.</span>
+            <label for="gemini-api-key-input">Your Gemini API Key (optional — overrides project default):</label>
+            <div class="gemini-key-row">
+              <input type="password" id="gemini-api-key-input" class="form-input" placeholder="AIzaSy... (leave empty to use project default)" value="${this.escapeHtml(geminiKey)}" autocomplete="off" spellcheck="false">
+              <button type="button" class="btn-subtle" id="btn-test-gemini-key" title="Verify this key with Google before saving">Test Key</button>
+            </div>
+            <span class="input-hint">Leave empty to use the built-in project key. Your key is never sent to our servers — browser to Google only, stored in this browser.</span>
+            <p class="gemini-test-status" id="gemini-key-test-status" aria-live="polite"></p>
+          </div>
+          </div>
+          <div class="ai-pane" id="ai-pane-openai" style="${activeProvider === 'openai_compat' ? '' : 'display:none;'}">
+            <div class="form-group">
+              <label for="openai-preset-select">Provider preset:</label>
+              <select id="openai-preset-select" class="form-input form-select" style="font-weight:600;cursor:pointer;">
+                <option value="custom">Custom endpoint…</option>
+                ${openAIPresets.map(pr => `<option value="${this.escapeHtml(pr.baseUrl)}" data-model="${this.escapeHtml(pr.model)}" ${pr.baseUrl === openAIBase ? 'selected' : ''}>${this.escapeHtml(pr.name)}</option>`).join('')}
+              </select>
+              <span class="input-hint">Pick a preset to fill the endpoint + model, or choose Custom for Ollama / LM Studio / proxies.</span>
+            </div>
+            <div class="form-group">
+              <label for="openai-base-url-input">Compatible endpoint (Base URL):</label>
+              <input type="text" id="openai-base-url-input" class="form-input" spellcheck="false" autocomplete="off" placeholder="https://api.openai.com/v1" value="${this.escapeHtml(openAIBase)}">
+              <span class="input-hint">Must end in <code>/v1</code> for cloud APIs (e.g. Groq: https://api.groq.com/openai/v1). Local: http://localhost:11434/v1</span>
+            </div>
+            <div class="form-group">
+              <label for="openai-model-input">Model name:</label>
+              <input type="text" id="openai-model-input" class="form-input" spellcheck="false" autocomplete="off" placeholder="gpt-4o-mini" value="${this.escapeHtml(openAIModel)}">
+              <span class="input-hint">Examples: gpt-4o-mini • llama-3.3-70b-versatile (Groq) • deepseek-chat • llama3.1 (Ollama)</span>
+            </div>
+            <div class="form-group">
+              <label for="openai-api-key-input">Your API key for this endpoint:</label>
+              <div class="gemini-key-row">
+                <input type="password" id="openai-api-key-input" class="form-input" placeholder="sk-... / gsk-... / ollama (local can be anything)" value="${this.escapeHtml(openAIKey)}" autocomplete="off" spellcheck="false">
+                <button type="button" class="btn-subtle" id="btn-test-openai-key" title="Verify this endpoint + key before saving">Test Key</button>
+              </div>
+              <span class="input-hint">Stored only in this browser. For local Ollama/LM Studio any non-empty value works.</span>
+              <p class="gemini-test-status" id="openai-key-test-status" aria-live="polite"></p>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
-          ${currentKey ? '<button class="btn-subtle btn-danger-subtle" id="btn-remove-gemini-key">Remove Key</button>' : ''}
+          ${(activeProvider === 'gemini' ? geminiKey : openAIKey) ? '<button class="btn-subtle btn-danger-subtle" id="btn-remove-gemini-key">Remove Key</button>' : ''}
           <div class="footer-actions-right">
             <button class="btn-subtle" id="btn-cancel-gemini-modal">Cancel</button>
-            <button class="btn-primary" id="btn-save-gemini-key">Save Settings</button>
+            <button class="btn-primary" id="btn-save-gemini-key">Test &amp; Save Settings</button>
           </div>
         </div>
       </div>
@@ -1616,25 +1784,170 @@ export class DocumentDesk {
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
     if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
 
-    if (saveBtn && inputKey) {
-      saveBtn.addEventListener('click', () => {
-        DocumentSummarizer.setApiKey(inputKey.value);
-        if (modelSelect) {
-          DocumentSummarizer.setSelectedModel(modelSelect.value);
+    let modalProvider = activeProvider;
+    const paneGemini = document.getElementById('ai-pane-gemini');
+    const paneOpenAI = document.getElementById('ai-pane-openai');
+    const modalDesc = document.getElementById('ai-modal-desc');
+    const providerTabs = modal.querySelectorAll('.ai-provider-tab');
+    const paintProvider = (pid) => {
+      modalProvider = pid;
+      providerTabs.forEach(b => {
+        const on = b.dataset.provider === pid;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      if (paneGemini) paneGemini.style.display = pid === 'gemini' ? '' : 'none';
+      if (paneOpenAI) paneOpenAI.style.display = pid === 'openai_compat' ? '' : 'none';
+    };
+    providerTabs.forEach(b => b.addEventListener('click', () => paintProvider(b.dataset.provider)));
+    const presetSelect = document.getElementById('openai-preset-select');
+    const baseInput = document.getElementById('openai-base-url-input');
+    const modelInput = document.getElementById('openai-model-input');
+    const openKeyInput = document.getElementById('openai-api-key-input');
+    if (presetSelect) presetSelect.addEventListener('change', () => {
+      if (presetSelect.value === 'custom' || !baseInput) return;
+      baseInput.value = presetSelect.value;
+      const opt = presetSelect.selectedOptions && presetSelect.selectedOptions[0];
+      const pm = opt && opt.dataset ? opt.dataset.model : '';
+      if (pm && modelInput && !modelInput.value.trim()) modelInput.value = pm;
+    });
+    const testBtn = document.getElementById('btn-test-gemini-key');
+    const testStatus = document.getElementById('gemini-key-test-status');
+    const setTestStatus = (msg, kind) => {
+      if (!testStatus) return;
+      testStatus.textContent = msg;
+      testStatus.dataset.kind = kind || '';
+    };
+    if (testBtn && inputKey) {
+      testBtn.addEventListener('click', async () => {
+        const keyVal = (inputKey.value || '').trim();
+        const modelVal = modelSelect ? modelSelect.value : currentModel;
+        if (!keyVal) { setTestStatus('Paste a key first, or leave empty to use the project default on Save.', 'warn'); return; }
+        testBtn.disabled = true;
+        const orig = testBtn.innerHTML;
+        testBtn.innerHTML = 'Testing...';
+        setTestStatus('Contacting Google AI Studio to verify this key...', 'pending');
+        const result = await DocumentSummarizer.testApiKey(keyVal, modelVal);
+        testBtn.disabled = false;
+        testBtn.innerHTML = orig;
+        if (result.ok) {
+          setTestStatus('Key verified - tap Save to activate Gemini AI.', 'ok');
+          try { ReadingTelemetry.log('byok_test_ok'); } catch (e) {}
+          showToast('Gemini key verified. Tap Save to activate.', 'success');
+        } else {
+          setTestStatus(`Key check failed: ${result.message}`, 'fail');
+          try { ReadingTelemetry.log('byok_test_fail'); } catch (e) {}
         }
+      });
+    }
+
+    const openTestBtn = document.getElementById('btn-test-openai-key');
+    const openTestStatus = document.getElementById('openai-key-test-status');
+    const setOpenStatus = (msg, kind) => {
+      if (!openTestStatus) return;
+      openTestStatus.textContent = msg;
+      openTestStatus.dataset.kind = kind || '';
+    };
+    if (openTestBtn) {
+      openTestBtn.addEventListener('click', async () => {
+        const k = (openKeyInput ? openKeyInput.value : '').trim();
+        const b = (baseInput ? baseInput.value : '').trim();
+        const m = (modelInput ? modelInput.value : '').trim();
+        if (!k) { setOpenStatus('Paste your key first, then tap Test.', 'warn'); return; }
+        openTestBtn.disabled = true;
+        openTestBtn.innerHTML = 'Testing...';
+        setOpenStatus('Contacting your endpoint to verify key + model...', 'pending');
+        const result = await DocumentSummarizer.testOpenAIKey(k, b, m);
+        openTestBtn.disabled = false;
+        openTestBtn.innerHTML = 'Test Key';
+        if (result.ok) {
+          setOpenStatus('Endpoint verified - tap Save to activate your Custom AI.', 'ok');
+          try { ReadingTelemetry.log('custom_ai_test_ok'); } catch (e) {}
+        } else {
+          setOpenStatus('Check failed: ' + result.message, 'fail');
+          try { ReadingTelemetry.log('custom_ai_test_fail'); } catch (e) {}
+        }
+      });
+    };
+
+    if (saveBtn && inputKey) {
+      saveBtn.addEventListener('click', async () => {
+        DocumentSummarizer.setProvider(modalProvider);
+        if (modalProvider === 'openai_compat') {
+          const k = (openKeyInput ? openKeyInput.value : '').trim();
+          const b = (baseInput ? baseInput.value : '').trim();
+          const m = (modelInput ? modelInput.value : '').trim();
+          saveBtn.disabled = true;
+          saveBtn.innerHTML = 'Verifying & Saving...';
+          if (!k) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = 'Test &amp; Save Settings';
+            setOpenStatus('Paste your key, or switch back to Gemini 2.0 (Default).', 'warn');
+            try { ReadingTelemetry.log('custom_ai_save_blocked'); } catch (e) {}
+            return;
+          }
+          const oresult = await DocumentSummarizer.testOpenAIKey(k, b, m);
+          if (!oresult.ok) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = 'Test &amp; Save Settings';
+            setOpenStatus('Could not verify: ' + oresult.message + '. Fix it or switch to Gemini 2.0.', 'fail');
+            try { ReadingTelemetry.log('custom_ai_save_blocked'); } catch (e) {}
+            return;
+          }
+          DocumentSummarizer.setOpenAIKey(k);
+          DocumentSummarizer.setOpenAIBaseUrl(b);
+          DocumentSummarizer.setOpenAIModel(m);
+          try { ReadingTelemetry.log('custom_ai_saved'); } catch (e) {}
+          saveBtn.disabled = false;
+          closeModal();
+          this.render();
+          showToast('Custom AI (' + m + ') connected! Summaries now use your endpoint.', 'success');
+          return;
+        }
+        const keyVal = (inputKey.value || '').trim();
+        const modelVal = modelSelect ? modelSelect.value : currentModel;
+        saveBtn.disabled = true;
+        const origSave = saveBtn.innerHTML;
+        saveBtn.innerHTML = 'Verifying & Saving...';
+        if (keyVal) {
+          const result = await DocumentSummarizer.testApiKey(keyVal, modelVal);
+          if (!result.ok) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = origSave;
+            setTestStatus(`Could not verify key: ${result.message}. Fix it or tap Cancel to stay offline.`, 'fail');
+            try { ReadingTelemetry.log('byok_save_blocked'); } catch (e) {}
+            showToast('Key not verified - not saved. Check the key and retry.', 'info');
+            return;
+          }
+        }
+        try { localStorage.removeItem(DocumentSummarizer.STORAGE_KEY); } catch (e) {}
+        if (keyVal) DocumentSummarizer.setApiKey(keyVal);
+        if (modelSelect) {
+          DocumentSummarizer.setSelectedModel(modelVal);
+        }
+        try { ReadingTelemetry.log(keyVal ? 'byok_saved' : 'byok_cleared'); } catch (e) {}
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = origSave;
         closeModal();
         this.render();
-        const activeModelName = availableModels.find(m => m.id === (modelSelect?.value || currentModel))?.name || 'Gemini 2.0 Flash';
-        showToast(`${activeModelName} settings saved! High-accuracy auto-summarization is active.`, 'success');
+        const activeModelName = availableModels.find(m => m.id === modelVal)?.name || 'Gemini 2.0 Flash';
+        showToast(keyVal ? `${activeModelName} settings saved! High-accuracy auto-summarization is active.` : 'Key cleared. Offline mode active.', 'success');
       });
     }
 
     if (removeBtn) {
       removeBtn.addEventListener('click', () => {
-        DocumentSummarizer.setApiKey('');
+        if (modalProvider === 'openai_compat') {
+          DocumentSummarizer.setOpenAIKey('');
+          try { ReadingTelemetry.log('custom_ai_cleared'); } catch (e) {}
+          showToast('Custom AI key removed.', 'info');
+        } else {
+          try { localStorage.removeItem(DocumentSummarizer.STORAGE_KEY); } catch (e) {}
+          try { ReadingTelemetry.log('byok_cleared'); } catch (e) {}
+          showToast('Gemini custom key removed. Project default (if any) is active.', 'info');
+        }
         closeModal();
         this.render();
-        showToast('Gemini API Key removed. Offline mode active.', 'info');
       });
     }
   }
