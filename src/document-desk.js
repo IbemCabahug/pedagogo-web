@@ -1959,16 +1959,16 @@ export class DocumentDesk {
       <div class="modal-card summary-chooser-card" role="dialog" aria-modal="true" aria-label="Choose a summary type">
         <div class="modal-header">
           <div class="modal-title-wrap">
-            <span class="modal-icon">✨</span>
+            <span class="modal-icon" aria-hidden="true">✦</span>
             <h3>What do you need from this file?</h3>
           </div>
-          <button class="modal-close" id="btn-close-summary-chooser" aria-label="Close">✕</button>
+          <button type="button" class="modal-close" id="btn-close-summary-chooser" aria-label="Close">×</button>
         </div>
         <div class="modal-body">
           <p class="gemini-modal-desc">Already loaded — you can scroll it in the <strong>Verbatim</strong> tab anytime. Pick the summary that fits your goal.</p>
           <div class="summary-type-list">
             ${types.map(t => `
-              <label class="summary-type-card${t.id === recommended ? ' recommended' : ''}" data-type="${t.id}">
+              <label class="summary-type-card${t.id === recommended ? ' recommended active' : ''}" data-type="${t.id}">
                 <input type="radio" name="summary-type" value="${t.id}" ${t.id === recommended ? 'checked' : ''}>
                 <span class="summary-type-icon">${t.icon}</span>
                 <span class="summary-type-meta">
@@ -1981,33 +1981,45 @@ export class DocumentDesk {
           <p class="gemini-test-status" id="summary-chooser-status" aria-live="polite"></p>
         </div>
         <div class="modal-footer">
-          <button class="btn-subtle" id="btn-cancel-summary-chooser">Not now — just browse</button>
-          <button class="btn-primary" id="btn-generate-summary">✨ Generate</button>
+          <button type="button" class="btn-subtle" id="btn-cancel-summary-chooser">Not now — just browse</button>
+          <button type="button" class="btn-primary" id="btn-generate-summary">✦ Generate</button>
         </div>
       </div>`;
 
     modal.classList.add('active');
-    const closeModal = () => modal.classList.remove('active');
+    const closeModal = () => {
+      modal.classList.remove('active');
+      modal.innerHTML = '';
+    };
+    const closeHandler = modal.querySelector('#btn-close-summary-chooser');
+    if (closeHandler) closeHandler.replaceWith(closeHandler.cloneNode(true));
     modal.querySelector('#btn-close-summary-chooser')?.addEventListener('click', closeModal);
+    const cancelHandler = modal.querySelector('#btn-cancel-summary-chooser');
+    if (cancelHandler) cancelHandler.replaceWith(cancelHandler.cloneNode(true));
     modal.querySelector('#btn-cancel-summary-chooser')?.addEventListener('click', () => {
       try { ReadingTelemetry.log('summary_dialog_aborted'); } catch (e) {}
       closeModal();
     });
+    modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+    modal.onkeydown = (e) => { if (e.key === 'Escape') closeModal(); };
+    const firstBtn = modal.querySelector('#btn-close-summary-chooser');
+    if (firstBtn) { try { firstBtn.focus({ preventScroll: true }); } catch (e) {} }
     modal.querySelectorAll('.summary-type-card').forEach(card => {
       card.addEventListener('click', () => {
-        card.querySelector('input').checked = true;
+        const input = card.querySelector('input');
+        if (input) input.checked = true;
         modal.querySelectorAll('.summary-type-card').forEach(c2 => c2.classList.toggle('active', c2 === card));
       });
     });
     const gen = modal.querySelector('#btn-generate-summary');
-    if (gen) {
-      gen.addEventListener('click', () => {
+    if (gen) gen.replaceWith(gen.cloneNode(true));
+    modal.querySelector('#btn-generate-summary')?.addEventListener('click', () => {
+        const btn = modal.querySelector('#btn-generate-summary');
         const chosen = (modal.querySelector('input[name="summary-type"]:checked')?.value) || recommended;
-        gen.disabled = true;
+        if (btn) btn.disabled = true;
         closeModal();
         this.runSummaryForType(chosen);
-      });
-    }
+    });
   }
 
 /**
@@ -2105,7 +2117,12 @@ export class DocumentDesk {
         </div>
       </div>`;
     modal.classList.add('active');
-    const close = () => modal.classList.remove('active');
+    const close = () => {
+      modal.classList.remove('active');
+      modal.innerHTML = '';
+    };
+    modal.onclick = (e) => { if (e.target === modal) close(); };
+    modal.onkeydown = (e) => { if (e.key === 'Escape') close(); };
     modal.querySelector('#btn-close-reviewer-gate')?.addEventListener('click', close);
     modal.querySelector('#btn-review-gate-skip')?.addEventListener('click', () => {
       try { ReadingTelemetry.log('reviewer_push_skip'); } catch (e) {}
