@@ -14,6 +14,8 @@ export class DocumentDesk {
     this.currentDoc = null;
     this.currentAnalysis = null;
     this.activeSubTab = 'synthesis'; // 'synthesis', 'cornell', or 'verbatim'
+    this.activeSummaryType = null;   // 'study' | 'quick' | 'reviewer' — Sprint B goal choice
+    this.verbatimVisibleCount = 25;  // Sprint B: lazy-render Verbatim to protect school-laptop perf
     this.searchQuery = '';
     this.isProcessing = false;
     this.isCornellFolded = false; // "Fold & Test" active recall state
@@ -209,6 +211,9 @@ export class DocumentDesk {
 
         <!-- Actions -->
         <div class="workspace-actions">
+          <button class="btn-primary btn-summarize-main" id="btn-summarize-main" title="Generate a summary from this document">
+            <span>✨ ${this.currentAnalysis ? 'Re-summarize' : 'Summarize'}</span>
+          </button>
           <button class="btn-subtle btn-toggle-split" id="btn-toggle-split-view" title="Toggle side-by-side view (Notes on left, Original document on right)">
             <span>${this.isSplitView ? '📖 Single View' : '📑 Split View'}</span>
           </button>
@@ -234,18 +239,23 @@ export class DocumentDesk {
       <div class="reading-view-body ${this.isSplitView ? 'split-active' : ''}" id="reading-view-body">
         <!-- View A: Pedagogical Synthesis -->
         <div class="synthesis-panel" id="synthesis-panel" style="${(this.activeSubTab === 'synthesis' || (this.isSplitView && this.activeSubTab !== 'cornell')) ? 'display: block;' : 'display: none;'}">
+          ${!this.currentAnalysis ? this.renderSummarizeEmptyState('synthesis') : `
           <div class="synthesis-meta-strip">
             <span class="synthesis-source-tag">
-              🌱 ${analysis?.source === 'OPENAI_COMPAT_API'
+              🌱 ${analysis?.source === 'QUICK_LOOK'
+                ? 'Quick Look — what this file says' + (!DocumentSummarizer.hasApiKey() ? ' (Basic Mode)' : '')
+                : (analysis?.source === 'OPENAI_COMPAT_API'
                 ? 'Analyzed via your Custom AI (' + this.escapeHtml(analysis.modelName || 'OpenAI-compatible') + ')'
                 : (analysis?.source === 'GEMINI_API'
                 ? 'Analyzed via Gemini Flash AI (Default)'
                 : (analysis?.source === 'LOCAL_EXTRACTIVE_NLP'
                   ? 'Local In-Browser Extractive Synthesis (Basic Mode — connect an AI key for full quality)'
-                  : 'Built-in Educational Sample (Basic Offline Mode — quality limited without an AI key)'))}
+                  : 'Built-in Educational Sample (Basic Offline Mode — quality limited without an AI key)')))})
             </span>
             <span class="synthesis-frameworks-badge">
-              ✓ Cornell Notes • ✓ Cognitive Chunking • ✓ Feynman Analogy • ✓ Contrastive Matrix • ✓ LET Practice
+              ${this.activeSummaryType === 'quick'
+                ? '✓ TL;DR ✓ Key Points ✓ Citations ✓ Study Next'
+                : '✓ Cornell Notes ✓ Cognitive Chunking ✓ Feynman Analogy ✓ Contrastive Matrix ✓ LET Practice'}
             </span>
             ${analysis?.source === 'LOCAL_EXTRACTIVE_NLP' && !DocumentSummarizer.hasApiKey() ? `
               <button class="btn-subtle" id="btn-upgrade-gemini-pill" style="margin-left: auto; font-size: 11.5px; padding: 3px 10px;">
@@ -267,13 +277,14 @@ export class DocumentDesk {
           </div>
           `}
           <div class="synthesis-content-render" id="synthesis-rendered-area">
-            ${this.renderSynthesisMarkdown(analysis?.markdown || '')}
+            ${this.activeSummaryType === 'quick' ? this.renderQuickLook(analysis?.markdown || '') : this.renderSynthesisMarkdown(analysis?.markdown || '')}
           </div>
         </div>
+          `}
 
         <!-- View B: Interactive Walter Pauk Cornell Note View -->
         <div class="cornell-panel" id="cornell-panel" style="${this.activeSubTab === 'cornell' ? 'display: block;' : 'display: none;'}">
-          ${this.renderCornellSheet(analysis?.markdown || '', doc)}
+          ${!this.currentAnalysis ? this.renderSummarizeEmptyState('cornell') : this.renderCornellSheet(analysis?.markdown || '', doc)}
         </div>
 
         <!-- View C: Verbatim Word-for-Word Reader -->
@@ -977,8 +988,13 @@ export class DocumentDesk {
 
   renderVerbatimUnits(doc) {
     const query = this.searchQuery.toLowerCase().trim();
+    const allUnits = doc.units || [];
 
-    return doc.units.map(unit => {
+    // Sprint B: lazy-render. Search bypasses pagination; otherwise render up to the visible count.
+    const maxShown = query ? allUnits.length : Math.max(1, this.verbatimVisibleCount || 25);
+    const visible = allUnits.slice(0, maxShown);
+    const hasMore = allUnits.length > maxShown;
+    const html = visible.map(unit => {
       let content = this.escapeHtml(unit.text);
 
       if (query) {
@@ -996,6 +1012,11 @@ export class DocumentDesk {
         </div>
       `;
     }).join('');
+
+    return html + (hasMore ? `
+      <button type="button" class="btn-subtle btn-verbatim-load-more" id="btn-verbatim-load-more" data-next="${maxShown + 25}">
+        ↓ Load more (${allUnits.length - maxShown} more ${(doc.unitLabel || 'Pages').toLowerCase()})
+      </button>` : '');
   }
 
   bindUploadEvents() {
@@ -1191,19 +1212,54 @@ export class DocumentDesk {
       });
     }
 
+    // Sprint B: choose-summary CTA + Verbatim lazy-load
+    const btnSummarizeMain = document.getElementById('btn-summarize-main');
+    if (btnSummarizeMain) {
+      btnSummarizeMain.addEventListener('click', () => {
+        try { ReadingTelemetry.log('summarize_cta_click'); } catch (e) {}
+        this.openSummaryChooser();
+      });
+    }
+    document.querySelectorAll('[id^="btn-summarize-empty-"]').forEach(b => {
+      b.addEventListener('click', () => this.openSummaryChooser());
+    });
+
+    const btnLoadMore = document.getElementById('btn-verbatim-load-more');
+    if (btnLoadMore) {
+      btnLoadMore.addEventListener('click', () => {
+        this.verbatimVisibleCount = parseInt(btnLoadMore.dataset.next, 10) || this.verbatimVisibleCount + 25;
+        const stream = document.getElementById('verbatim-stream');
+        if (stream && this.currentDoc) {
+          stream.innerHTML = this.renderVerbatimUnits(this.currentDoc);
+          this.bindCopyUnitButtons();
+        }
+      });
+    }
+
     // Unit jump pills
     document.querySelectorAll('.unit-jump-pill').forEach(pill => {
       pill.addEventListener('click', () => {
         document.querySelectorAll('.unit-jump-pill').forEach(p => p.classList.remove('active'));
         pill.classList.add('active');
         const unitNum = pill.dataset.unit;
+        let changed = false;
         if (unitNum === 'all') {
-          document.querySelectorAll('.verbatim-unit-card').forEach(card => card.style.display = 'block');
-        } else {
-          document.querySelectorAll('.verbatim-unit-card').forEach(card => {
-            card.style.display = card.dataset.unit === unitNum ? 'block' : 'none';
-          });
+          this.verbatimVisibleCount = (this.currentDoc?.units || []).length;
+          changed = true;
+        } else if (parseInt(unitNum, 10) > this.verbatimVisibleCount) {
+          this.verbatimVisibleCount = parseInt(unitNum, 10);
+          changed = true;
         }
+        if (changed) {
+          const stream = document.getElementById('verbatim-stream');
+          if (stream && this.currentDoc) {
+            stream.innerHTML = this.renderVerbatimUnits(this.currentDoc);
+            this.bindCopyUnitButtons();
+          }
+        }
+        document.querySelectorAll('.verbatim-unit-card').forEach(card => {
+          card.style.display = unitNum === 'all' || card.dataset.unit === unitNum ? 'block' : 'none';
+        });
       });
     });
 
@@ -1359,36 +1415,18 @@ export class DocumentDesk {
         }
       }
 
-      this.updateLoadingDesc('Running 5-Part Pedagogical Synthesis (Cornell, Chunks, Feynman, Matrix, LET)...');
+      this.updateLoadingDesc('Document loaded — no AI call needed until you choose a summary type.');
 
-      let forceBasic = false;
-      try { forceBasic = sessionStorage.getItem('pedagogo_force_basic') === '1'; } catch (e) {}
-      let analysis;
-      if (forceBasic) {
-        analysis = await DocumentSummarizer.extractPedagogicalAnalysis(extractedDoc);
-        analysis.source = 'LOCAL_EXTRACTIVE_NLP';
-      } else {
-        analysis = await DocumentSummarizer.summarize(extractedDoc);
-      }
-      
+      // Sprint B: file-first. Show the source verbatim, do NOT auto-summarize.
       this.currentDoc = extractedDoc;
-      this.currentAnalysis = analysis;
-      this.activeSubTab = 'synthesis';
+      this.currentAnalysis = null;
+      this.activeSummaryType = null;
+      this.activeSubTab = 'verbatim';
       this.hideLoading();
       this.render();
-
-      if (analysis.source === 'LOCAL_EXTRACTIVE_NLP') {
-        showToast(`🌱 Analyzed "${extractedDoc.filename}" from its actual text! (Connect an AI key anytime for generative synthesis)`, 'info');
-      } else if (analysis.source === 'OPENAI_COMPAT_API') {
-        showToast(`🔌 "${extractedDoc.filename}" synthesized via your Custom AI (${analysis.modelName})!`, 'success');
-      } else if (analysis.source === 'GEMINI_API') {
-        showToast(`✨ Document "${extractedDoc.filename}" synthesized via Gemini Flash AI (Default)!`, 'success');
-      if ((analysis.source === 'GEMINI_API' || analysis.source === 'OPENAI_COMPAT_API') && DocumentSummarizer.shouldSuggestPro(extractedDoc)) {
-        try { ReadingTelemetry.log('pro_nudge_shown'); } catch (e) {}
-        setTimeout(() => showToast('Long/dense file — for deeper reasoning, retry with Gemini 2.5 Pro in AI Settings.', 'info'), 2500);
-      }
-      } else {
-        showToast(`Document "${extractedDoc.filename}" loaded successfully!`, 'success');
+      showToast(`"${extractedDoc.filename}" is loaded — review the source, then choose a summary.`, 'info');
+      if (typeof this.openSummaryChooser === 'function') {
+        this.openSummaryChooser();
       }
     } catch (err) {
       this.hideLoading();
@@ -1529,7 +1567,17 @@ export class DocumentDesk {
   }
 
   ensureUnitCardVisible(unitNum) {
-    const targetCard = document.getElementById(`unit-card-${unitNum}`);
+    // Sprint B: if the target unit is beyond the lazy-render window, load it first.
+    let targetCard = document.getElementById(`unit-card-${unitNum}`);
+    if (!targetCard && this.currentDoc) {
+      this.verbatimVisibleCount = Math.max(this.verbatimVisibleCount || 25, unitNum);
+      const stream = document.getElementById('verbatim-stream');
+      if (stream) {
+        stream.innerHTML = this.renderVerbatimUnits(this.currentDoc);
+        this.bindCopyUnitButtons();
+      }
+      targetCard = document.getElementById(`unit-card-${unitNum}`);
+    }
     if (targetCard && targetCard.style.display === 'none') {
       document.querySelectorAll('.verbatim-unit-card').forEach(c => {
         c.style.display = 'block';
@@ -1648,7 +1696,206 @@ export class DocumentDesk {
     if (overlay) overlay.style.display = 'none';
   }
 
-  openGeminiModal() {
+  /**
+   * Sprint B — file-first empty state shown in Synthesis/Cornell tabs before any summary exists.
+   */
+  renderSummarizeEmptyState(panelKey) {
+    return `
+      <div class="summarize-empty-state">
+        <div class="empty-state-icon">🧠</div>
+        <h3>Ready for a summary?</h3>
+        <p>Your file is loaded — the <strong>Verbatim</strong> tab shows the original, word-for-word. Tell me what you need it for.</p>
+        <button class="btn-primary" id="btn-summarize-empty-${panelKey}">✨ Choose Summary Type</button>
+      </div>`;
+  }
+
+  /**
+   * Sprint B — Quick Look renderer (markdown that is NOT the 5-part contract).
+   */
+  renderQuickLook(md) {
+    if (!md) return '<p class="empty-text">No analysis available.</p>';
+    return `<div class="pedagogical-card card-quick-look"><div class="card-body-content">${this.simpleMarkdown(md)}</div></div>`;
+  }
+
+  /**
+   * Sprint B — 3-goal summary chooser (goal-scaffold, not a menu for its own sake).
+   * Smart default pre-selected via DocumentSummarizer.getRecommendedSummaryType().
+   */
+  openSummaryChooser() {
+    if (!this.currentDoc) return;
+    const types = DocumentSummarizer.SUMMARY_TYPES || [];
+    const recommended = DocumentSummarizer.getRecommendedSummaryType(this.currentDoc);
+    let modal = document.getElementById('summary-chooser-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'summary-chooser-modal';
+      modal.className = 'modal-backdrop';
+      document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+      <div class="modal-card summary-chooser-card" role="dialog" aria-modal="true" aria-label="Choose a summary type">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <span class="modal-icon">✨</span>
+            <h3>What do you need from this file?</h3>
+          </div>
+          <button class="modal-close" id="btn-close-summary-chooser" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="gemini-modal-desc">Already loaded — you can scroll it in the <strong>Verbatim</strong> tab anytime. Pick the summary that fits your goal.</p>
+          <div class="summary-type-list">
+            ${types.map(t => `
+              <label class="summary-type-card${t.id === recommended ? ' recommended' : ''}" data-type="${t.id}">
+                <input type="radio" name="summary-type" value="${t.id}" ${t.id === recommended ? 'checked' : ''}>
+                <span class="summary-type-icon">${t.icon}</span>
+                <span class="summary-type-meta">
+                  <span class="summary-type-title">${t.title}${t.id === recommended ? ' <span class="recommended-badge">Recommended</span>' : ''}</span>
+                  <span class="summary-type-desc">${t.desc}</span>
+                  <span class="summary-type-why">${t.why}</span>
+                </span>
+              </label>`).join('')}
+          </div>
+          <p class="gemini-test-status" id="summary-chooser-status" aria-live="polite"></p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-subtle" id="btn-cancel-summary-chooser">Not now — just browse</button>
+          <button class="btn-primary" id="btn-generate-summary">✨ Generate</button>
+        </div>
+      </div>`;
+
+    modal.classList.add('active');
+    const closeModal = () => modal.classList.remove('active');
+    modal.querySelector('#btn-close-summary-chooser')?.addEventListener('click', closeModal);
+    modal.querySelector('#btn-cancel-summary-chooser')?.addEventListener('click', () => {
+      try { ReadingTelemetry.log('summary_dialog_aborted'); } catch (e) {}
+      closeModal();
+    });
+    modal.querySelectorAll('.summary-type-card').forEach(card => {
+      card.addEventListener('click', () => {
+        card.querySelector('input').checked = true;
+        modal.querySelectorAll('.summary-type-card').forEach(c2 => c2.classList.toggle('active', c2 === card));
+      });
+    });
+    const gen = modal.querySelector('#btn-generate-summary');
+    if (gen) {
+      gen.addEventListener('click', () => {
+        const chosen = (modal.querySelector('input[name="summary-type"]:checked')?.value) || recommended;
+        gen.disabled = true;
+        closeModal();
+        this.runSummaryForType(chosen);
+      });
+    }
+  }
+
+/**
+   * Sprint B — runs the chosen summary type against the current doc.
+   * 'study' + 'reviewer' share the full synthesis (reviewer adds a push-to-Reviewer
+   * confirmation gate with an inline mini-quiz ready to scroll to).
+   */
+  async runSummaryForType(type) {
+    if (!this.currentDoc) return;
+    try { ReadingTelemetry.log('summary_type_' + (type || 'study')); } catch (e) {}
+
+    let forceBasic = false;
+    try { forceBasic = sessionStorage.getItem('pedagogo_force_basic') === '1'; } catch (e) {}
+
+    const label = type === 'quick' ? 'Quick Look' : (type === 'reviewer' ? 'Reviewer Pack' : 'Study Sheet');
+    this.showLoading(`Generating ${label}...`, type === 'quick'
+      ? 'Reading the file and writing a fast overview...'
+      : 'Running 5-Part Pedagogical Synthesis (Cornell, Chunks, Feynman, Matrix, LET)...');
+
+    try {
+      let analysis;
+      if (type === 'quick') {
+        analysis = await DocumentSummarizer.summarizeQuick(this.currentDoc);
+      } else if (forceBasic) {
+        analysis = await DocumentSummarizer.extractPedagogicalAnalysis(this.currentDoc);
+        analysis.source = 'LOCAL_EXTRACTIVE_NLP';
+      } else {
+        analysis = await DocumentSummarizer.summarize(this.currentDoc);
+      }
+      this.currentAnalysis = analysis;
+      this.activeSummaryType = analysis.source === 'QUICK_LOOK' ? 'quick' : type;
+      this.activeSubTab = 'synthesis';
+      this.hideLoading();
+      this.render();
+
+      const name = this.currentDoc.filename;
+      if (analysis.source === 'QUICK_LOOK') {
+        showToast(`⚡ Quick Look for "${name}" is ready!`, 'success');
+      } else if (analysis.source === 'OPENAI_COMPAT_API') {
+        showToast(`🔌 "${name}" synthesized via your Custom AI (${analysis.modelName})!`, 'success');
+      } else if (analysis.source === 'GEMINI_API') {
+        showToast(`✨ "${name}" synthesized via Gemini Flash AI (Default)!`, 'success');
+      } else {
+        showToast(`🌱 Analyzed "${name}" from its actual text!`, 'info');
+      }
+
+      if ((analysis.source === 'GEMINI_API' || analysis.source === 'OPENAI_COMPAT_API') && DocumentSummarizer.shouldSuggestPro(this.currentDoc)) {
+        try { ReadingTelemetry.log('pro_nudge_shown'); } catch (e) {}
+        setTimeout(() => showToast('Long/dense file — for deeper reasoning, try Gemini 2.5 Pro in AI Settings.', 'info'), 2500);
+      }
+
+      if (type === 'reviewer') {
+        const qs = this.collectReviewerQuestions();
+        if (qs && qs.length) this.openReviewerGate(qs);
+      }
+    } catch (err) {
+      this.hideLoading();
+      showToast(`${err.message}`, 'warning');
+    }
+  }
+
+  /**
+   * Sprint B — confirmation gate before bulk-importing practice items to LET Reviewer
+   * (pilot guard from enhancement plan §8.3: no blind bulk import). Mini-quiz is already
+   * on screen in Section 5 of the synthesis — this offers the spaced 1d/3d/7d push.
+   */
+  openReviewerGate(questions) {
+    const mcqs = questions.filter(q => q.cardKind === 'SCENARIO_MCQ').length;
+    const fills = questions.filter(q => q.cardKind === 'TERM_FILL_IN').length;
+    let modal = document.getElementById('reviewer-gate-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'reviewer-gate-modal';
+      modal.className = 'modal-backdrop';
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = `
+      <div class="modal-card reviewer-gate-card" role="dialog" aria-modal="true" aria-label="Push drills to LET Reviewer">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <span class="modal-icon">🎯</span>
+            <h3>Practice found — push to LET Reviewer?</h3>
+          </div>
+          <button class="modal-close" id="btn-close-reviewer-gate" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="reviewer-gate-counts">This reading produced <strong>${mcqs} scenario question${mcqs === 1 ? '' : 's'}</strong> and <strong>${fills} term drill${fills === 1 ? '' : 's'}</strong>.</p>
+          <p class="gemini-modal-desc">You can practice them right here in Section 5 (scroll down). Push them to the LET Reviewer to get them back on a <strong>1d / 3d / 7d</strong> spaced schedule.</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-subtle" id="btn-review-gate-skip">Practice here first</button>
+          <button class="btn-primary" id="btn-review-gate-push">📥 Push ${questions.length} to LET Reviewer</button>
+        </div>
+      </div>`;
+    modal.classList.add('active');
+    const close = () => modal.classList.remove('active');
+    modal.querySelector('#btn-close-reviewer-gate')?.addEventListener('click', close);
+    modal.querySelector('#btn-review-gate-skip')?.addEventListener('click', () => {
+      try { ReadingTelemetry.log('reviewer_push_skip'); } catch (e) {}
+      close();
+    });
+    modal.querySelector('#btn-review-gate-push')?.addEventListener('click', () => {
+      try { ReadingTelemetry.log('reviewer_push_confirm'); } catch (e) {}
+      this.dispatchReviewerImport(questions);
+      close();
+      showToast(`✓ ${questions.length} drills pushed to LET Reviewer (1d / 3d / 7d).`, 'success');
+    });
+  }
+
+openGeminiModal() {
     let modal = document.getElementById('gemini-settings-modal');
     if (!modal) {
       modal = document.createElement('div');

@@ -1,4 +1,5 @@
 import synthesisPromptV1 from './prompts/reading-synthesis.v1.md?raw';
+import quickPromptV1 from './prompts/summary-quick.v1.md?raw';
 
 /**
  * Pedagogo Desk: Pedagogical Document Summarizer & AI Engine 🧠🌿
@@ -366,6 +367,50 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
     } catch { return false; }
   }
 
+  /**
+   * Sprint B — summary type catalog ("what do you need from this file?").
+   * Labelled by GOAL, not by format, so the choice scaffolds SRL forethought
+   * instead of inviting choice overload.
+   */
+  static SUMMARY_TYPES = [
+    { id: 'study', icon: '📘', title: 'Study Sheet', desc: 'Full Cornell study sheet + practice questions.', why: 'For textbook readings and chapters you must master.' },
+    { id: 'quick', icon: '⚡', title: 'Quick Look', desc: 'What this file says in ~5 bullets.', why: 'For before class, or skimming an order or slide deck.' },
+    { id: 'reviewer', icon: '🎯', title: 'LET Reviewer Pack', desc: 'Practice cards + instant mini-quiz, then push to LET Reviewer.', why: 'For anything you have to memorize.' }
+  ];
+
+  /**
+   * Sprint B — smart default: pre-select the summary type most aligned with
+   * the document's shape. The user can always override.
+   */
+  static getRecommendedSummaryType(extractedDoc) {
+    const name = String((extractedDoc && extractedDoc.filename) || '').toLowerCase();
+    if (/(order|memo|memorandum|deped|advisory)/i.test(name)) return 'reviewer';
+    const ft = String((extractedDoc && extractedDoc.fileType) || '').toLowerCase();
+    if (ft === 'pptx' || ft === 'ppt' || /(slide|deck|handout|notes)/i.test(name)) return 'quick';
+    return 'study';
+  }
+
+  static getQuickPrompt() {
+    return quickPromptV1;
+  }
+
+  /**
+   * Sprint B — Quick Look: a lighter, cheaper, faster summary contract.
+   * Falls back to a compact local extract when no key exists.
+   */
+  static async summarizeQuick(extractedDoc) {
+    // OpenAI-compatible BYOK slot (incl. StepFun): quick prompt, smaller budget.
+    if (this.getProvider() === 'openai_compat' && this.getOpenAIKey().trim()) {
+      const text = await this.completeWithOpenAI(this.getQuickPrompt() + '\n\n' + this._buildQuickHeader(extractedDoc), { maxTokens: 2048 });
+      return { source: 'QUICK_LOOK', modelName: this.getOpenAIModel(), markdown: text, analyzedAt: new Date().toISOString() };
+    }
+    const result = await this._runGeminiForPrompt(this.getQuickPrompt() + '\n\n' + this._buildQuickHeader(extractedDoc), extractedDoc, 2048);
+    if (result) {
+      return { source: 'QUICK_LOOK', modelName: result.modelName, isMultimodal: result.isMultimodal, markdown: result.text, analyzedAt: new Date().toISOString() };
+    }
+    return { source: 'QUICK_LOOK', modelName: 'Client-Side TextRank (Offline)', markdown: this._buildFallbackQuickLook(extractedDoc), analyzedAt: new Date().toISOString() };
+  }
+
   static async summarize(extractedDoc) {
     // OpenAI-compatible BYOK slot: same synthesis prompt, chat-completions transport.
     if (this.getProvider() === 'openai_compat') {
@@ -472,6 +517,81 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
   /**
    * Pre-computed, research-grade sample analyses for immediate zero-config demonstration.
    */
+  static _buildQuickHeader(extractedDoc) {
+    return 'Here is the educational reading material for a QUICK LOOK summary:\n'
+      + '**Document Title:** ' + extractedDoc.filename + ' (' + extractedDoc.fileType + ')\n'
+      + '**Total Units:** ' + extractedDoc.totalUnits + ' ' + extractedDoc.unitLabel + '\n\n'
+      + '**Verbatim Document Content:**\n' + extractedDoc.rawText.slice(0, 120000);
+  }
+
+  /** Shared Gemini text call used by Quick Look only (never touches summarize()). */
+  static async _runGeminiForPrompt(systemPrompt, extractedDoc, maxTokens) {
+    const apiKey = this.getApiKey();
+    if (!apiKey) return null;
+    const selectedModel = this.getSelectedModel();
+    const modelsToTry = [selectedModel, ...this.getLegacyFallbackModels().filter(m => m !== selectedModel)];
+    const canUseMultimodal = Boolean(extractedDoc.base64Data && (extractedDoc.fileType === 'PDF' || extractedDoc.fileType === 'IMAGE'));
+    const parts = canUseMultimodal ? [
+      { text: systemPrompt },
+      { inlineData: { mimeType: extractedDoc.mimeType || (extractedDoc.fileType === 'PDF' ? 'application/pdf' : 'image/jpeg'), data: extractedDoc.base64Data } }
+    ] : [{ text: systemPrompt }];
+    const payload = {
+      contents: [{ role: 'user', parts }],
+      generationConfig: { temperature: 0.15, topP: 0.9, topK: 32, maxOutputTokens: maxTokens || 8192 }
+    };
+    for (const model of modelsToTry) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) continue;
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text && text.trim().length > 20) {
+          const modelMeta = this.getAvailableModels().find(m => m.id === model);
+          return { text: text.trim(), modelName: modelMeta?.name || model, isMultimodal: canUseMultimodal };
+        }
+      } catch (err) {
+        console.warn(`Gemini quick (${model}) fetch error:`, err);
+      }
+    }
+    return null;
+  }
+
+  /** Compact Quick Look built locally (no key): TL;DR + top chunk names + terms. */
+  static _buildFallbackQuickLook(extractedDoc) {
+    const full = this.extractPedagogicalAnalysis(extractedDoc);
+    const md = full.markdown || '';
+    const lines = [];
+    lines.push('### 1. Quick Look (Local Extract)');
+    const tldrMatch = md.match(/\*\*TL;DR[^\n]*\*\*\s*([^\n]+)/i);
+    lines.push('- **TL;DR:** ' + ((tldrMatch && tldrMatch[1].trim()) || 'What this document covers, extracted locally from the text.').slice(0, 220));
+    lines.push('- **Key Points:**');
+    // Local engine emits "#### Chunk N: Title • [Page X]"; AI contract emits "**Chunk N — Name:**".
+    const chunks = (md.match(/(?:#### |\*\*)Chunk\s*\d+\s*[:：—]\s*([^*\n•]{1,80})/gi) || [])
+      .map(c => {
+        const m = c.match(/[:：—]\s*([^*\n•]{1,80})/);
+        return m ? m[1].trim() : c.replace(/^(?:#### |\*\*)/, '').trim();
+      })
+      .filter(Boolean).slice(0, 3);
+    // Term bank body rows (skip the header row + any header-ish cells).
+    const skipHeader = /^(term|in-text meaning|memory anchor|source)$/i;
+    const bankTerms = (md.match(/^\|\s*\*\*?[^|\n]+?\*\*?\s*\|/gm) || [])
+      .map(r => r.replace(/^\|\s*\*+/, '').replace(/\*+\s*\|$/, '').replace(/\|$/, '').trim())
+      .filter(t => Boolean(t) && !skipHeader.test(t) && !/^(term|in-text meaning|memory anchor|source)$/i.test(t))
+      .slice(0, 5);
+    const points = chunks.slice(0, 3);
+    if (bankTerms.length) points.push('Key terms: ' + bankTerms.join(', '));
+    if (points.length === 0) points.push('Verify details against the Verbatim tab before trusting any claim.');
+    points.slice(0, 5).forEach(p => lines.push('  1. ' + p.replace(/\s*\[(?:Page|Slide|Section|Unit)\s*\d+\]\s*$/i, '')));
+    lines.push('- **Study Next:** Familiarize — cover the term meanings above, self-test once, then restudy in 1-3 days.');
+    return lines.join('\n');
+  }
+
+
   static getBuiltinSamples() {
     return [
       {
