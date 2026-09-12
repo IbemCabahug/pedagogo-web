@@ -9047,3 +9047,108 @@ body.dark-mode .inventory-status {
     display: none !important;
   }
 }
+/* =========================================================
+   Field-Test Polish: Rhythm Streaks (Attendance + LET Review, 2026-09)
+   Sage-toned continuity nudges — a rhythm, never a guilt meter.
+   ========================================================= */
+
+/* Attendance: roll-call streak pulse dots (inside fs-stat-pill) */
+.streak-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.streak-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-light);
+  background: transparent;
+  flex: none;
+}
+
+.streak-dot.on {
+  background: var(--sage-primary);
+  border-color: var(--sage-primary);
+}
+
+body.dark-mode .streak-dot.on {
+  background: #A2CFA9;
+  border-color: #A2CFA9;
+}
+
+/* LET Reviewer: Practice Rhythm card (streak pill + 7-day pulse) */
+.practice-rhythm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.rhythm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rhythm-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.rhythm-streak-pill {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--sage-text);
+  background: var(--sage-light);
+  padding: 4px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.rhythm-weekly-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rhythm-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1.5px solid var(--border-light);
+  background: transparent;
+  flex: none;
+}
+
+.rhythm-dot.on {
+  background: var(--sage-primary);
+  border-color: var(--sage-primary);
+}
+
+body.dark-mode .rhythm-dot.on {
+  background: #A2CFA9;
+  border-color: #A2CFA9;
+}
+
+.rhythm-days-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.rhythm-note {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}

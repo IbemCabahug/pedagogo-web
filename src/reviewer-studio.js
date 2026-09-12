@@ -273,6 +273,41 @@ export class ReviewerStudio {
     return stats;
   }
 
+  /**
+   * Field-test polish: practice rhythm — consecutive review days (from drill
+   * logs) ending today, plus a 7-day pulse. Sage tones: a rhythm, not a meter.
+   */
+  getPracticeStats() {
+    const tz = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    const byDay = new Map();
+    (this.logs || []).forEach(l => {
+      if (!l || !l.date) return;
+      const ds = tz(new Date(l.date));
+      if (ds) byDay.set(ds, (byDay.get(ds) || 0) + 1);
+    });
+
+    const today = tz(new Date());
+    const prevOf = (ds) => { const d = new Date(`${ds}T00:00:00`); d.setDate(d.getDate() - 1); return tz(d); };
+
+    let cursor = byDay.has(today) ? today : (byDay.has(prevOf(today)) ? prevOf(today) : null);
+    let days = 0;
+    while (cursor && byDay.has(cursor)) {
+      days++;
+      cursor = prevOf(cursor);
+    }
+
+    const week = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      const ds = tz(d);
+      week.push({ date: ds, count: byDay.get(ds) || 0 });
+    }
+
+    return { days, todayCount: byDay.get(today) || 0, totalLogs: this.logs.length, week };
+  }
+
   /* =========================================================================
    * STARTER DECK (20 Realistic LET Items with PPST Tags & Spaced Scheduling)
    * ========================================================================= */
@@ -682,6 +717,22 @@ export class ReviewerStudio {
 
     const domainStats = this.getDomainStats();
     const ppstStats = this.getPpstDomainStats();
+    const rhythm = this.getPracticeStats();
+    const rhythmStreakLabel = rhythm.days >= 2
+      ? `<span class="rhythm-streak-pill">🔥 ${rhythm.days}-day review streak</span>`
+      : (rhythm.days === 1
+        ? `<span class="rhythm-streak-pill">${rhythm.todayCount > 0 ? '🌿 Reviewing today' : '🌿 1-day rhythm started'}</span>`
+        : `<span class="rhythm-streak-pill">🌱 Start your rhythm</span>`);
+    const rhythmDots = rhythm.week.map(w =>
+      `<span class="rhythm-dot ${w.count > 0 ? 'on' : 'off'}" title="${w.date}: ${w.count} review${w.count === 1 ? '' : 's'}"></span>`
+    ).join('');
+    const rhythmNote = rhythm.days >= 3
+      ? `Dunlosky et al. (2013) found distributed retrieval is the #1 high-utility technique — a ${rhythm.days}-day rhythm is exactly the pattern that builds long-term recall. Keep it gentle and steady.`
+      : (rhythm.days === 1
+        ? 'A calm first step! Review again tomorrow to start building a steady retrieval rhythm.'
+        : (rhythm.totalLogs > 0
+          ? 'Your cards are resting until their next spaced interval. Reviewing ahead anytime keeps the rhythm alive.'
+          : 'Run your first Daily Drill to begin your personal retrieval rhythm — 5 calm minutes is all it takes.'));
 
     const filtered = this.cards.filter(c => {
       if (this.activeFilter === 'ALL') return true;
@@ -773,6 +824,16 @@ export class ReviewerStudio {
             `;
           }).join('')}
         </div>
+      </div>
+
+      <!-- Field-test polish: Practice Rhythm (streak + 7-day pulse) -->
+      <div class="practice-rhythm-card">
+        <div class="rhythm-head">
+          <span class="rhythm-title">🌿 Practice Rhythm</span>
+          ${rhythmStreakLabel}
+        </div>
+        <div class="rhythm-weekly-dots">${rhythmDots}<span class="rhythm-days-label">Reviews • last 7 days</span></div>
+        <p class="rhythm-note">${rhythmNote}</p>
       </div>
 
       <!-- Readiness Analytics & PPST Coverage Map Section -->

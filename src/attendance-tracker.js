@@ -256,6 +256,38 @@ export class AttendanceTracker {
     };
   }
 
+  /**
+   * Field-test polish: roll-call rhythm streak across ALL sections.
+   * Counts consecutive calendar days with at least one roll call, ending today.
+   * If today isn't marked yet but yesterday was, the streak is still "alive"
+   * (come back today to extend it). Sage tones — a rhythm, never a guilt meter.
+   */
+  getStreak() {
+    const tz = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    const dates = new Set(this.store.sessions.map(s => s.date).filter(Boolean));
+    const today = tz(new Date());
+    const prevOf = (ds) => { const d = new Date(`${ds}T00:00:00`); d.setDate(d.getDate() - 1); return tz(d); };
+
+    let cursor = dates.has(today) ? today : (dates.has(prevOf(today)) ? prevOf(today) : null);
+    let days = 0;
+    while (cursor && dates.has(cursor)) {
+      days++;
+      cursor = prevOf(cursor);
+    }
+
+    // Last 7 days (ending today) for the pulse dots.
+    const week = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      const ds = tz(d);
+      week.push({ date: ds, on: dates.has(ds) });
+    }
+
+    return { days, markedToday: dates.has(today), week };
+  }
+
   // =========================================================
   // Rendering
   // =========================================================
@@ -266,6 +298,13 @@ export class AttendanceTracker {
     const activeClass = this.classManager?.getClassroom ? this.classManager.getClassroom(this.selectedClassId) : null;
     const hasClasses = (this.classManager?.classes || []).length > 0;
     const totals = this.getTotalStats();
+    const streak = this.getStreak();
+    const streakNum = streak.days >= 2
+      ? `🔥 ${streak.days}d`
+      : (streak.days === 1 ? '🌿 1d' : '🌱 0d');
+    const streakDots = streak.week.map(w =>
+      `<span class="streak-dot ${w.on ? 'on' : 'off'}" title="${w.date}"></span>`
+    ).join('');
 
     let html = `
       <div class="view-header">
@@ -292,6 +331,11 @@ export class AttendanceTracker {
         <div class="fs-stat-pill">
           <span class="stat-num">${totals.learners}</span>
           <span class="stat-label">Learners Tracked</span>
+        </div>
+        <div class="fs-stat-pill">
+          <span class="stat-num">${streakNum}</span>
+          <span class="stat-label">Roll Call Streak</span>
+          <span class="streak-dots">${streakDots}</span>
         </div>
         <div class="fs-curriculum-badge">
           <span>✓ DepEd SF2-Aligned • Present / Tardy / Excused / Absent</span>
@@ -333,7 +377,9 @@ export class AttendanceTracker {
             <span>📋 Open Roll Call for This Date</span>
           </button>
         </div>
-        <p class="att-launcher-hint">🌿 Opening a roll call gently marks every enrolled learner <strong>Present</strong> by default — you only adjust the exceptions. No guilt, just peaceful bookkeeping.</p>
+        <p class="att-launcher-hint">${streak.days >= 3
+          ? `🌿 You've marked attendance <strong>${streak.days} days in a row</strong> — keep the peaceful rhythm going today.`
+          : `🌿 Opening a roll call gently marks every enrolled learner <strong>Present</strong> by default — you only adjust the exceptions. No guilt, just peaceful bookkeeping.`}</p>
       </div>
     `;
 
