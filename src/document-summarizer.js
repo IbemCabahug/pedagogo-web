@@ -524,7 +524,9 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
     if (result) {
       return { source: 'QUICK_LOOK', modelName: result.modelName, isMultimodal: result.isMultimodal, markdown: result.text, analyzedAt: new Date().toISOString() };
     }
-    return { source: 'QUICK_LOOK', modelName: 'Client-Side TextRank (Offline)', markdown: this._buildFallbackQuickLook(extractedDoc), analyzedAt: new Date().toISOString() };
+    const quickFallback = { source: 'QUICK_LOOK', modelName: 'Client-Side TextRank (Offline)', markdown: this._buildFallbackQuickLook(extractedDoc), analyzedAt: new Date().toISOString() };
+    if (this._sawQuota429) quickFallback.quotaNotice = 'daily-limit';
+    return quickFallback;
   }
 
   static async summarize(extractedDoc) {
@@ -553,8 +555,9 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
     }
 
     const selectedModel = this.getSelectedModel();
-    // Sprint A.5: selected model first, then silent legacy fallbacks (2.0/1.5).
+    // Sprint A.5: selected model first, then silent legacy fallbacks.
     const modelsToTry = [selectedModel, ...this.getLegacyFallbackModels().filter(m => m !== selectedModel)];
+    this._sawQuota429 = false; // honest quota UX: reset per run, set on any 429 (see fallback return)
 
     // Build prompt payload: check if multimodal inline document is available (PDF or Image)
     const canUseMultimodal = Boolean(extractedDoc.base64Data && (extractedDoc.fileType === 'PDF' || extractedDoc.fileType === 'IMAGE'));
@@ -623,6 +626,7 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
           });
 
           if (!response.ok) {
+            if (response.status === 429) this._sawQuota429 = true; // daily free limit hit — surface it later, don't just vanish into TextRank
             const errJson = await response.json().catch(() => ({}));
             const errMsg = errJson?.error?.message || `HTTP ${response.status} ${response.statusText}`;
             console.warn(`Gemini API (${model} via ${route.name}) returned error: ${errMsg}. Trying next route.`);
@@ -652,7 +656,9 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
     }
 
     console.warn('All Gemini API attempts exhausted. Switching to local TextRank extractive engine.');
-    return this.extractPedagogicalAnalysis(extractedDoc);
+    const localAnalysis = this.extractPedagogicalAnalysis(extractedDoc);
+    if (this._sawQuota429) localAnalysis.quotaNotice = 'daily-limit';
+    return localAnalysis;
   }
 
   /**
@@ -669,6 +675,7 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
   static async _runGeminiForPrompt(systemPrompt, extractedDoc, maxTokens) {
     const apiKey = this.getApiKey();
     if (!apiKey) return null;
+    this._sawQuota429 = false; // reset per run (Quick Look path)
     const selectedModel = this.getSelectedModel();
     const modelsToTry = [selectedModel, ...this.getLegacyFallbackModels().filter(m => m !== selectedModel)];
     const canUseMultimodal = Boolean(extractedDoc.base64Data && (extractedDoc.fileType === 'PDF' || extractedDoc.fileType === 'IMAGE'));
@@ -708,7 +715,10 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
             headers: this.getGeminiHeaders(apiKey),
             body: JSON.stringify(route.body)
           });
-          if (!response.ok) continue;
+          if (!response.ok) {
+            if (response.status === 429) this._sawQuota429 = true;
+            continue;
+          }
           const data = await response.json();
           const text = route.name === 'interactions'
             ? this._extractInteractionText(data)

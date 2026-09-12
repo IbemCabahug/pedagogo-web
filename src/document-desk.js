@@ -2288,15 +2288,21 @@ export class DocumentDesk {
       } else {
         // Trust fix: honest offline label — the old "from its actual text"
         // hid that TextRank scaffolding is lower quality than AI.
-        const needsKey = !DocumentSummarizer.hasApiKey();
-        showToast(needsKey
-          ? `📝 Offline extract for "${name}" — connect a free Gemini key for full accuracy.`
-          : `📝 Offline extract for "${name}" — Gemini unreachable, verify against Verbatim.`, 'info');
+        if (analysis.quotaNotice) {
+          // Honest quota UX (2026-09-13): a 429 no longer degrades silently.
+          try { ReadingTelemetry.log('quota_notice_shown'); } catch (e) {}
+          showToast('🕒 Daily AI limit reached — showing the offline extract. Your own free key (AI Studio) has its own quota, or retry tomorrow.', 'info');
+        } else {
+          const needsKey = !DocumentSummarizer.hasApiKey();
+          showToast(needsKey
+            ? `📝 Offline extract for "${name}" — connect a free Gemini key for full accuracy.`
+            : `📝 Offline extract for "${name}" — Gemini unreachable, verify against Verbatim.`, 'info');
+        }
       }
 
       if ((analysis.source === 'GEMINI_API' || analysis.source === 'OPENAI_COMPAT_API') && DocumentSummarizer.shouldSuggestPro(this.currentDoc)) {
         try { ReadingTelemetry.log('pro_nudge_shown'); } catch (e) {}
-        setTimeout(() => showToast('Long/dense file — for deeper reasoning, try Gemini 2.5 Pro in AI Settings.', 'info'), 2500);
+        setTimeout(() => showToast('Long/dense file — for deeper reasoning, try Gemini 3.8 Flash in AI Settings.', 'info'), 2500);
       }
 
       if (type === 'reviewer') {
@@ -2385,19 +2391,19 @@ openGeminiModal() {
         <div class="modal-header">
           <div class="modal-title-wrap">
             <span class="modal-icon">🔑</span>
-            <h3>AI Setup — Default Gemini 2.0 + Your Own Key</h3>
+            <h3>AI Setup — Default Gemini Flash + Your Own Key</h3>
           </div>
           <button class="modal-close" id="btn-close-gemini-modal">✕</button>
         </div>
         <div class="modal-body">
           <div class="ai-provider-tabs" role="tablist" aria-label="AI provider">
-            <button type="button" class="ai-provider-tab${activeProvider === 'gemini' ? ' active' : ''}" data-provider="gemini" role="tab" aria-selected="${activeProvider === 'gemini' ? 'true' : 'false'}">✨ Gemini 2.0 (Default)</button>
+            <button type="button" class="ai-provider-tab${activeProvider === 'gemini' ? ' active' : ''}" data-provider="gemini" role="tab" aria-selected="${activeProvider === 'gemini' ? 'true' : 'false'}">✨ Gemini (Default)</button>
             <button type="button" class="ai-provider-tab${activeProvider === 'openai_compat' ? ' active' : ''}" data-provider="openai_compat" role="tab" aria-selected="${activeProvider === 'openai_compat' ? 'true' : 'false'}">🔌 Custom AI Key</button>
           </div>
           <p class="gemini-modal-desc" id="ai-modal-desc">
             ${activeProvider === 'openai_compat'
               ? 'Use your own OpenAI-compatible key (OpenAI, Groq, OpenRouter, DeepSeek, or a local server). Same study sheets, your endpoint.'
-              : 'Generate research-backed study sheets at <strong>$0.00 cost</strong> with the built-in Gemini 2.0 default — or switch to your own key anytime.'}
+              : 'Generate research-backed study sheets at <strong>$0.00 cost</strong> on the free tier — daily limits apply. Switch to your own key anytime.'}
           </p>
 
           <div class="gemini-steps-card">
@@ -2409,8 +2415,9 @@ openGeminiModal() {
               <li>Paste it below. It is stored <em>only in your browser's localStorage</em>.</li>
             </ol>
             <div class="gemini-free-limits-badge">
-              ✓ Free Tier: 15 requests/min • 1,500 requests/day • 1,000,000 token context window
+              ✓ Free Tier: $0 per token • per-model daily limits apply (your live limits show in AI Studio)
             </div>
+            <span class="input-hint" style="display:block; margin-top:6px;">ℹ️ Free-tier tradeoff (per Google): content sent with a free key may be used to improve Google's products — paid keys disable that. Keep confidential documents off free keys.</span>
           </div>
 
           <div class="ai-pane" id="ai-pane-gemini" style="${activeProvider === 'gemini' ? '' : 'display:none;'}">
