@@ -275,6 +275,9 @@ export class DocumentSummarizer {
       return { ok: false, message: 'That key looks too short — paste the full key from AI Studio.' };
     }
     // Route 1: Interactions API (GA June 2026).
+    // Live-verified 2026-09-13 with an AQ. project key: thinking models burn
+    // token budgets on thoughts (status "incomplete", finishReason MAX_TOKENS),
+    // so verify by REPLY TEXT with thinking_level:'low' — not just HTTP 200.
     try {
       const res = await fetch(this.buildInteractionsEndpoint(), {
         method: 'POST',
@@ -282,17 +285,21 @@ export class DocumentSummarizer {
         body: JSON.stringify({
           model: modelId,
           input: 'Reply with the single word: ok',
-          generation_config: { max_output_tokens: 8 },
+          generation_config: { max_output_tokens: 512, thinking_level: 'low' },
           store: false
         })
       });
       if (res.ok) {
-        this._logRouteTelemetry('route_interactions_ok');
-        return { ok: true, model: modelId, route: 'interactions' };
+        const data = await res.json().catch(() => ({}));
+        if (this._extractInteractionText(data).trim()) {
+          this._logRouteTelemetry('route_interactions_ok');
+          return { ok: true, model: modelId, route: 'interactions' };
+        }
       }
     } catch (err) { /* network hiccup — the legacy route below reports honestly */ }
     this._logRouteTelemetry('route_interactions_failover');
     // Route 2 (failover): legacy v1beta models/:generateContent.
+    // Same live-verified thinking caveat: verify by reply text, not HTTP 200.
     const endpoint = this.buildGeminiEndpoint(modelId);
     try {
       const res = await fetch(endpoint, {
@@ -300,10 +307,14 @@ export class DocumentSummarizer {
         headers: this.getGeminiHeaders(key),
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: 'Reply with the single word: ok' }] }],
-          generationConfig: { temperature: 0, maxOutputTokens: 8 }
+          generationConfig: { temperature: 0, maxOutputTokens: 512 }
         })
       });
-      if (res.ok) return { ok: true, model: modelId, route: 'generateContent' };
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (text.trim()) return { ok: true, model: modelId, route: 'generateContent' };
+      }
       const errJson = await res.json().catch(() => ({}));
       const msg = errJson?.error?.message || `HTTP ${res.status}`;
       return { ok: false, message: msg };
