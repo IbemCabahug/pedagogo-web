@@ -101,9 +101,11 @@ export class DocumentSummarizer {
   }
 
   static getActiveProviderLabel() {
+    // Discretion pass: neutral display only (currently unused; kept defensive —
+    // never expose provider/model ids in user-facing strings).
     return this.getProvider() === 'openai_compat'
-      ? ('OpenAI-Compatible (' + this.getOpenAIModel() + ')')
-      : ('Gemini (' + this.getSelectedModel() + ')');
+      ? 'Own access key'
+      : 'Full Study Mode (built-in)';
   }
 
   static getCustomKey() {
@@ -164,10 +166,12 @@ export class DocumentSummarizer {
   static DEFAULT_MODEL = 'gemini-3.6-flash';
 
   static getAvailableModels() {
+    // Discretion pass (2026-09-13): display names are neutral tiers — the ids
+    // below stay the real provider model ids and are never shown in the UI.
     return [
-      { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash (Recommended)', desc: 'Best balance: speed + multimodal, current stable Flash family' },
-      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (Most Intelligent)', desc: 'Strongest reasoning; use for dense theory / curriculum orders' },
-      { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash (Legacy-Fast)', desc: 'Baseline speed for routine short readings / school WiFi' }
+      { id: 'gemini-3.6-flash', name: 'Standard (Recommended)', desc: 'Best balance of detail and speed for study sheets' },
+      { id: 'gemini-3.8-flash', name: 'Advanced (Deepest)', desc: 'Deepest reasoning; use for dense theory / curriculum orders' },
+      { id: 'gemini-3.5-flash', name: 'Fast (Lightest)', desc: 'Baseline speed for routine short readings' }
     ];
   }
 
@@ -295,7 +299,7 @@ export class DocumentSummarizer {
   static async testApiKey(apiKey, modelId = this.DEFAULT_MODEL) {
     const key = (apiKey || '').trim();
     if (!key || key.length < 10) {
-      return { ok: false, message: 'That key looks too short — paste the full key from AI Studio.' };
+      return { ok: false, message: 'That key looks too short — paste the full key from the key portal.' };
     }
     // Route 1: Interactions API (GA June 2026).
     // Live-verified 2026-09-13 with an AQ. project key: thinking models burn
@@ -542,7 +546,7 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
     // OpenAI-compatible BYOK slot (incl. StepFun): quick prompt, smaller budget.
     if (this.getProvider() === 'openai_compat' && this.getOpenAIKey().trim()) {
       const ctrl = this._activeCtrl = new AbortController();
-      this._notifyStage(onStage, 'Sending the document text to your Custom AI…');
+      this._notifyStage(onStage, 'Reading your document…');
       const text = await this.completeWithOpenAI(this.getQuickPrompt() + '\n\n' + this._buildQuickHeader(extractedDoc), { maxTokens: 2048, signal: ctrl.signal });
       return { source: 'QUICK_LOOK', modelName: this.getOpenAIModel(), markdown: text, analyzedAt: new Date().toISOString() };
     }
@@ -567,7 +571,7 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
       }
       const oModel = this.getOpenAIModel();
       const oCtrl = this._activeCtrl = new AbortController();
-      this._notifyStage(onStage, 'Sending the document text to your Custom AI…');
+      this._notifyStage(onStage, 'Reading your document…');
       const oPrompt = this.getSystemPrompt() + "\n\nHere is the educational reading material to analyze:\n**Document Title:** " + extractedDoc.filename + " (" + extractedDoc.fileType + ")\n**Total Units:** " + extractedDoc.totalUnits + " " + extractedDoc.unitLabel + "\n\n**Verbatim Document Content:**\n" + extractedDoc.rawText.slice(0, 120000);
       const synthesis = await this.completeWithOpenAI(oPrompt, { maxTokens: 8192, signal: oCtrl.signal });
       return { source: 'OPENAI_COMPAT_API', modelName: oModel, markdown: synthesis, analyzedAt: new Date().toISOString() };
@@ -615,7 +619,7 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
 
     // Sprint P0: try each model through the Interactions API first (GA June 2026),
     // then silently fail over to legacy generateContent on the same model.
-    this._notifyStage(onStage, canUseMultimodal ? 'Uploading the PDF/image to Gemini…' : 'Sending the document text to Gemini…');
+    this._notifyStage(onStage, canUseMultimodal ? 'Reading your document carefully…' : 'Reading your document…');
     for (const model of modelsToTry) {
       // Reuse the first text part (system prompt + doc header) so both routes see identical wording.
       const prompt = parts[0] && parts[0].text ? parts[0].text : '';
@@ -648,8 +652,7 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
       ];
 
       for (const route of routes) {
-        this._notifyStage(onStage, 'Contacting ' + (this.getAvailableModels().find(m => m.id === model)?.name || model)
-          + (route.name === 'interactions' ? ' — main route…' : ' — backup route…'));
+        this._notifyStage(onStage, route.name === 'interactions' ? 'Preparing your sections…' : 'Almost done — finalizing…');
         try {
           const response = await fetch(route.endpoint, {
             method: 'POST',
@@ -724,7 +727,7 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
     };
     for (const model of modelsToTry) {
       // Sprint P0: Interactions first, legacy generateContent as silent failover.
-      this._notifyStage(onStage, 'Asking Gemini for a quick overview…');
+      this._notifyStage(onStage, 'Preparing the overview…');
       const routes = [
         {
           name: 'interactions',

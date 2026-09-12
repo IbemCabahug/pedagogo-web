@@ -305,11 +305,11 @@ export class DocumentDesk {
     if (prov === 'openai_compat' && !hasOpenAI) {
       showKeyPill = true;
       keyBadgeIcon = '🔌';
-      keyBadgeText = 'Connect Your AI Key';
+      keyBadgeText = 'Connect Your Access Key';
     } else if (prov !== 'openai_compat' && !DocumentSummarizer.hasApiKey()) {
       showKeyPill = true;
       keyBadgeIcon = '🔑';
-      keyBadgeText = 'Setup Free Gemini Key';
+      keyBadgeText = 'Setup Full Study Mode';
     }
 
     this.container.innerHTML = `
@@ -452,12 +452,12 @@ export class DocumentDesk {
               🌱 ${analysis?.source === 'QUICK_LOOK'
                 ? 'Quick Look — what this file says' + (!DocumentSummarizer.hasApiKey() ? ' (Basic Mode)' : '')
                 : (analysis?.source === 'OPENAI_COMPAT_API'
-                ? 'Analyzed via your Custom AI (' + this.escapeHtml(analysis.modelName || 'OpenAI-compatible') + ')'
+                ? 'Analyzed via your access key (' + this.escapeHtml(analysis.modelName || 'custom provider') + ')'
                 : (analysis?.source === 'GEMINI_API'
-                ? 'Analyzed via Gemini Flash AI (Default)'
+                ? 'Analyzed with Full Study Mode (built-in)'
                 : (['LOCAL_EXTRACTIVE_NLP', 'LOCAL_TEXTRANK_ENGINE'].includes(analysis?.source)
-                  ? 'Offline extract — keyword scaffolding, needs AI key for accuracy'
-                  : 'Built-in Educational Sample (Basic Offline Mode — quality limited without an AI key)')))})
+                  ? 'Offline extract — keyword scaffolding, enable Full Study Mode for accuracy'
+                  : 'Built-in Educational Sample (Basic Offline Mode — quality limited without Full Study Mode)')))})
             </span>
             <span class="synthesis-frameworks-badge">
               ${this.activeSummaryType === 'quick'
@@ -466,7 +466,7 @@ export class DocumentDesk {
             </span>
             ${['LOCAL_EXTRACTIVE_NLP', 'LOCAL_TEXTRANK_ENGINE'].includes(analysis?.source) && !DocumentSummarizer.hasApiKey() ? `
               <button class="btn-subtle" id="btn-upgrade-gemini-pill" style="margin-left: auto; font-size: 11.5px; padding: 3px 10px;">
-                ⚡ <span>Connect Free Gemini Key for Generative AI</span>
+                ⚡ <span>Enable Full Study Mode (free)</span>
               </button>
             ` : ''}
           </div>
@@ -475,7 +475,7 @@ export class DocumentDesk {
             <div class="guard-icon">🔍</div>
             <div class="guard-body">
               <strong>Before you trust this — tap one citation to verify it.</strong>
-              <span>AI can sound confident even when wrong. One tap on [Page X] jumps to the exact words in your file.</span>
+              <span>Summaries can sound confident even when wrong. One tap on [Page X] jumps to the exact words in your file.</span>
             </div>
             <div class="guard-actions">
               <button class="btn-subtle" id="btn-guard-verify">Verify a claim now</button>
@@ -1828,7 +1828,7 @@ export class DocumentDesk {
         }
       }
 
-      this.updateLoadingDesc('Document loaded — no AI call needed until you choose a summary type.');
+      this.updateLoadingDesc('Document loaded — everything stays on this device until you choose a summary type.');
 
       // Sprint B: file-first. Show the source verbatim, do NOT auto-summarize.
       this.currentDoc = extractedDoc;
@@ -2304,7 +2304,7 @@ export class DocumentDesk {
     const label = type === 'quick' ? 'Quick Look' : (type === 'reviewer' ? 'Reviewer Pack' : 'Study Sheet');
     this.showLoading(`Generating ${label}...`, 'Reading the file and preparing the analysis…', {
       showTimer: true,
-      timeHint: 'AI synthesis usually takes 15–60 s (longer for big or scanned files)',
+      timeHint: 'This usually takes 15–60 s (longer for large files)',
       cancellable: true,
       onCancel: () => {
         try { ReadingTelemetry.log('summary_cancelled'); } catch (e) {}
@@ -2336,27 +2336,27 @@ export class DocumentDesk {
       if (analysis.source === 'QUICK_LOOK') {
         showToast(`⚡ Quick Look for "${name}" is ready!`, 'success');
       } else if (analysis.source === 'OPENAI_COMPAT_API') {
-        showToast(`🔌 "${name}" synthesized via your Custom AI (${analysis.modelName})!`, 'success');
+        showToast(`✨ Your ${label} for "${name}" is ready!`, 'success');
       } else if (analysis.source === 'GEMINI_API') {
-        showToast(`✨ "${name}" synthesized via Gemini Flash AI (Default)!`, 'success');
+        showToast(`✨ Your ${label} for "${name}" is ready!`, 'success');
       } else {
         // Trust fix: honest offline label — the old "from its actual text"
         // hid that TextRank scaffolding is lower quality than AI.
         if (analysis.quotaNotice) {
           // Honest quota UX (2026-09-13): a 429 no longer degrades silently.
           try { ReadingTelemetry.log('quota_notice_shown'); } catch (e) {}
-          showToast('🕒 Daily AI limit reached — showing the offline extract. Your own free key (AI Studio) has its own quota, or retry tomorrow.', 'info');
+          showToast('🕒 Daily limit reached — showing the offline extract. Your own access key has its own limit, or retry tomorrow.', 'info');
         } else {
           const needsKey = !DocumentSummarizer.hasApiKey();
           showToast(needsKey
-            ? `📝 Offline extract for "${name}" — connect a free Gemini key for full accuracy.`
-            : `📝 Offline extract for "${name}" — Gemini unreachable, verify against Verbatim.`, 'info');
+            ? `📝 Offline extract for "${name}" — turn on Full Study Mode in Settings for full accuracy.`
+            : `📝 Offline extract for "${name}" — Full Study Mode unreachable, verify against Verbatim.`, 'info');
         }
       }
 
       if ((analysis.source === 'GEMINI_API' || analysis.source === 'OPENAI_COMPAT_API') && DocumentSummarizer.shouldSuggestPro(this.currentDoc)) {
         try { ReadingTelemetry.log('pro_nudge_shown'); } catch (e) {}
-        setTimeout(() => showToast('Long/dense file — for deeper reasoning, try Gemini 3.8 Flash in AI Settings.', 'info'), 2500);
+        setTimeout(() => showToast('Long/dense file — for deeper reasoning, try a deeper quality tier in Settings.', 'info'), 2500);
       }
 
       if (type === 'reviewer') {
@@ -2448,38 +2448,38 @@ openGeminiModal() {
         <div class="modal-header">
           <div class="modal-title-wrap">
             <span class="modal-icon">🔑</span>
-            <h3>AI Setup — Default Gemini Flash + Your Own Key</h3>
+            <h3>Full Study Mode — Settings</h3>
           </div>
           <button class="modal-close" id="btn-close-gemini-modal">✕</button>
         </div>
         <div class="modal-body">
           <div class="ai-provider-tabs" role="tablist" aria-label="AI provider">
-            <button type="button" class="ai-provider-tab${activeProvider === 'gemini' ? ' active' : ''}" data-provider="gemini" role="tab" aria-selected="${activeProvider === 'gemini' ? 'true' : 'false'}">✨ Gemini (Default)</button>
-            <button type="button" class="ai-provider-tab${activeProvider === 'openai_compat' ? ' active' : ''}" data-provider="openai_compat" role="tab" aria-selected="${activeProvider === 'openai_compat' ? 'true' : 'false'}">🔌 Custom AI Key</button>
+            <button type="button" class="ai-provider-tab${activeProvider === 'gemini' ? ' active' : ''}" data-provider="gemini" role="tab" aria-selected="${activeProvider === 'gemini' ? 'true' : 'false'}">✨ Built-in (Default)</button>
+            <button type="button" class="ai-provider-tab${activeProvider === 'openai_compat' ? ' active' : ''}" data-provider="openai_compat" role="tab" aria-selected="${activeProvider === 'openai_compat' ? 'true' : 'false'}">🔌 Own Access Key</button>
           </div>
           <p class="gemini-modal-desc" id="ai-modal-desc">
             ${activeProvider === 'openai_compat'
-              ? 'Use your own OpenAI-compatible key (OpenAI, Groq, OpenRouter, DeepSeek, or a local server). Same study sheets, your endpoint.'
-              : 'Generate research-backed study sheets at <strong>$0.00 cost</strong> on the free tier — daily limits apply. Switch to your own key anytime.'}
+              ? 'Use your own compatible service (OpenAI-compatible endpoints, Groq, OpenRouter, DeepSeek, or a local server). Same study sheets, your provider.'
+              : 'Generate research-backed study sheets with the <strong>built-in tier</strong> — no cost, daily limits apply. Or paste your own access key anytime.'}
           </p>
 
           <div class="gemini-steps-card">
-            <h4>How to get your free key in 30 seconds:</h4>
+            <h4>How to enable it free in 30 seconds:</h4>
             <ol>
-              <li>Go to <a href="https://aistudio.google.com/" target="_blank" rel="noopener">Google AI Studio (aistudio.google.com)</a></li>
+              <li>Open <a href="https://aistudio.google.com/" target="_blank" rel="noopener">the key portal (aistudio.google.com)</a></li>
               <li>Sign in with any Google account.</li>
               <li>Click <strong>"Get API Key"</strong> &gt; <strong>"Create API Key"</strong>.</li>
               <li>Paste it below. It is stored <em>only in your browser's localStorage</em>.</li>
             </ol>
             <div class="gemini-free-limits-badge">
-              ✓ Free Tier: $0 per token • per-model daily limits apply (your live limits show in AI Studio)
+              ✓ Built-in tier: no cost • daily limits apply
             </div>
-            <span class="input-hint" style="display:block; margin-top:6px;">ℹ️ Free-tier tradeoff (per Google): content sent with a free key may be used to improve Google's products — paid keys disable that. Keep confidential documents off free keys.</span>
+            <span class="input-hint" style="display:block; margin-top:6px;">ℹ️ Privacy note (per the key provider): content sent with a free key may be used to improve their services — paid keys disable that. Keep confidential documents off free keys.</span>
           </div>
 
           <div class="ai-pane" id="ai-pane-gemini" style="${activeProvider === 'gemini' ? '' : 'display:none;'}">
           <div class="form-group">
-            <label for="gemini-model-select">Gemini Model Tier (Default):</label>
+            <label for="gemini-model-select">Quality Tier:</label>
             <select id="gemini-model-select" class="form-input form-select" style="font-weight: 600; cursor: pointer;">
               ${availableModels.map(m => `
                 <option value="${m.id}" ${m.id === currentModel ? 'selected' : ''}>
@@ -2491,12 +2491,12 @@ openGeminiModal() {
           </div>
 
           <div class="form-group">
-            <label for="gemini-api-key-input">Your Gemini API Key (optional — overrides project default):</label>
+            <label for="gemini-api-key-input">Access key (optional — overrides the built-in tier):</label>
             <div class="gemini-key-row">
-              <input type="password" id="gemini-api-key-input" class="form-input" placeholder="AIzaSy... (leave empty to use project default)" value="${this.escapeHtml(geminiKey)}" autocomplete="off" spellcheck="false">
-              <button type="button" class="btn-subtle" id="btn-test-gemini-key" title="Verify this key with Google before saving">Test Key</button>
+              <input type="password" id="gemini-api-key-input" class="form-input" placeholder="Paste your access key (leave empty for the built-in tier)" value="${this.escapeHtml(geminiKey)}" autocomplete="off" spellcheck="false">
+              <button type="button" class="btn-subtle" id="btn-test-gemini-key" title="Verify this key before saving">Test Key</button>
             </div>
-            <span class="input-hint">Leave empty to use the built-in project key. Your key is never sent to our servers — browser to Google only, stored in this browser.</span>
+            <span class="input-hint">Leave empty to use the built-in tier. Stored only in this browser — requests go directly to the key provider, never to our servers.</span>
             <p class="gemini-test-status" id="gemini-key-test-status" aria-live="polite"></p>
           </div>
           </div>
@@ -2604,14 +2604,14 @@ openGeminiModal() {
         testBtn.disabled = true;
         const orig = testBtn.innerHTML;
         testBtn.innerHTML = 'Testing...';
-        setTestStatus('Contacting Google AI Studio to verify this key...', 'pending');
+        setTestStatus('Verifying your key…', 'pending');
         const result = await DocumentSummarizer.testApiKey(keyVal, modelVal);
         testBtn.disabled = false;
         testBtn.innerHTML = orig;
         if (result.ok) {
-          setTestStatus('Key verified - tap Save to activate Gemini AI.', 'ok');
+          setTestStatus('Key verified - tap Save to activate Full Study Mode.', 'ok');
           try { ReadingTelemetry.log('byok_test_ok'); } catch (e) {}
-          showToast('Gemini key verified. Tap Save to activate.', 'success');
+          showToast('Access key verified. Tap Save to activate.', 'success');
         } else {
           setTestStatus(`Key check failed: ${result.message}`, 'fail');
           try { ReadingTelemetry.log('byok_test_fail'); } catch (e) {}
@@ -2639,7 +2639,7 @@ openGeminiModal() {
         openTestBtn.disabled = false;
         openTestBtn.innerHTML = 'Test Key';
         if (result.ok) {
-          setOpenStatus('Endpoint verified - tap Save to activate your Custom AI.', 'ok');
+          setOpenStatus('Endpoint verified - tap Save to activate your access key.', 'ok');
           try { ReadingTelemetry.log('custom_ai_test_ok'); } catch (e) {}
         } else {
           setOpenStatus('Check failed: ' + result.message, 'fail');
@@ -2660,7 +2660,7 @@ openGeminiModal() {
           if (!k) {
             saveBtn.disabled = false;
             saveBtn.innerHTML = 'Test &amp; Save Settings';
-            setOpenStatus('Paste your key, or switch back to Gemini 2.0 (Default).', 'warn');
+            setOpenStatus('Paste your key, or switch back to Built-in (Default).', 'warn');
             try { ReadingTelemetry.log('custom_ai_save_blocked'); } catch (e) {}
             return;
           }
@@ -2668,7 +2668,7 @@ openGeminiModal() {
           if (!oresult.ok) {
             saveBtn.disabled = false;
             saveBtn.innerHTML = 'Test &amp; Save Settings';
-            setOpenStatus('Could not verify: ' + oresult.message + '. Fix it or switch to Gemini 2.0.', 'fail');
+            setOpenStatus('Could not verify: ' + oresult.message + '. Fix it or switch to Built-in (Default).', 'fail');
             try { ReadingTelemetry.log('custom_ai_save_blocked'); } catch (e) {}
             return;
           }
@@ -2679,7 +2679,7 @@ openGeminiModal() {
           saveBtn.disabled = false;
           closeModal();
           this.render();
-          showToast('Custom AI (' + m + ') connected! Summaries now use your endpoint.', 'success');
+          showToast('Access key connected! Study sheets now use your provider.', 'success');
           return;
         }
         const keyVal = (inputKey.value || '').trim();
@@ -2708,7 +2708,7 @@ openGeminiModal() {
         saveBtn.innerHTML = origSave;
         closeModal();
         this.render();
-        const activeModelName = availableModels.find(m => m.id === modelVal)?.name || 'Gemini 2.0 Flash';
+        const activeModelName = availableModels.find(m => m.id === modelVal)?.name || 'Built-in tier';
         showToast(keyVal ? `${activeModelName} settings saved! High-accuracy auto-summarization is active.` : 'Key cleared. Offline mode active.', 'success');
       });
     }
@@ -2718,11 +2718,11 @@ openGeminiModal() {
         if (modalProvider === 'openai_compat') {
           DocumentSummarizer.setOpenAIKey('');
           try { ReadingTelemetry.log('custom_ai_cleared'); } catch (e) {}
-          showToast('Custom AI key removed.', 'info');
+          showToast('Access key removed.', 'info');
         } else {
           try { localStorage.removeItem(DocumentSummarizer.STORAGE_KEY); } catch (e) {}
           try { ReadingTelemetry.log('byok_cleared'); } catch (e) {}
-          showToast('Gemini custom key removed. Project default (if any) is active.', 'info');
+          showToast('Access key removed. Built-in tier (if any) is active.', 'info');
         }
         closeModal();
         this.render();
