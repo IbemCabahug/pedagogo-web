@@ -16,6 +16,7 @@ export class DocumentDesk {
     this.searchQuery = '';
     this.isProcessing = false;
     this.isCornellFolded = false; // "Fold & Test" active recall state
+    this.termBankMisses = new Map(); // term -> { meaning, anchor } starred as "couldn't recall"
     this.isSplitView = localStorage.getItem('pedagogo_reader_split_view') === 'true';
     this.originSubTab = 'synthesis';
     this.originScrollY = 0;
@@ -623,9 +624,38 @@ export class DocumentDesk {
       ? blocks
       : rawQuizText.split(/\*\*Question \d+:\*\*/g).filter(b => b.trim().length > 0).map((body, i) => ({ label: `Question ${i + 1}`, body }));
 
-    let fillCounter = 0;
+    // Study Next recommendation → call-to-action card (Part C)
+    let studyNextHtml = '';
+    const studyNextMatch = rawQuizText.match(/\*\*Study Next:\*\*\s*([^\n]+)/i);
+    if (studyNextMatch) {
+      const reco = studyNextMatch[1].trim();
+      const typeMatch = reco.match(/\b(Familiarize|Understand|Memorize)\b/i);
+      const type = typeMatch ? typeMatch[1] : 'Memorize';
+      studyNextHtml = `
+        <div class=\"study-next-card\" data-study-type=\"${type.toLowerCase()}\">
+          <div class=\"study-next-head\">
+            <span class=\"study-next-badge\">🔁 Study Next — ${type}</span>
+          </div>
+          <p class=\"study-next-reco\">${this.simpleMarkdown(reco)}</p>
+          <div class=\"study-next-actions\">
+            <button type=\"button\" class=\"btn-study-next btn-study-next-familiarize\" title=\"Cover the Term Bank and recall each meaning aloud\">🙈 Test Term Bank</button>
+            <button type=\"button\" class=\"btn-study-next btn-study-next-push\" title=\"Import all MCQs + fill-in drills into your LET Reviewer (spaced 1d / 3d / 7d)\">📥 Push All Drills</button>
+            <button type=\"button\" class=\"btn-study-next btn-study-next-misses\" style=\"display:none\" title=\"Import only the terms you starred as misses\">⭐ Push Missed Terms (0)</button>
+          </div>
+        </div>`;
+    }
 
-    return questionBlocks.map((item, idx) => {
+    return this._renderSynthesisCards(questionBlocks, rawQuizText) + studyNextHtml;
+  }
+
+
+  /**
+   * Renders the MCQ + fill-in drill cards for Section 5 (Part A + Part B).
+   * Extracted from renderInteractiveQuiz so the Study Next card can append after it.
+   */
+  _renderSynthesisCards(questionBlocks, rawQuizText) {
+    let fillCounter = 0;
+    const cards = questionBlocks.map((item, idx) => {
       const isFillIn = /^Fill-in/i.test(item.label || '');
       const block = item.body || '';
       if (isFillIn) {
@@ -660,12 +690,12 @@ export class DocumentDesk {
         `;
       }
       const qNum = idx + 1;
-      let answerMatch = block.match(/\*\*Correct Answer:\*\*\s*([A-D])/i);
-      let answer = answerMatch ? answerMatch[1].toUpperCase() : 'A';
-      let rationaleMatch = block.match(/\*\*Pedagogical Rationalization:\*\*\s*([\s\S]*?)(?=(?:\*\*(?:Question|Fill-in|Study Next)|$))/i);
-      let rationale = rationaleMatch ? rationaleMatch[1].trim() : 'Active recall tests deep conceptual alignment.';
+      const answerMatch = block.match(/\*\*Correct Answer:\*\*\s*([A-D])/i);
+      const answer = answerMatch ? answerMatch[1].toUpperCase() : 'A';
+      const rationaleMatch = block.match(/\*\*Pedagogical Rationalization:\*\*\s*([\s\S]*?)(?=(?:\*\*(?:Question|Fill-in|Study Next)|$))/i);
+      const rationale = rationaleMatch ? rationaleMatch[1].trim() : 'Active recall tests deep conceptual alignment.';
 
-      let promptAndOptions = block
+      const promptAndOptions = block
         .replace(/\*\*Correct Answer:\*\*[\s\S]*$/, '')
         .trim();
 
@@ -690,6 +720,116 @@ export class DocumentDesk {
         </div>
       `;
     }).join('');
+    return cards;
+  }
+
+  /**
+   * Parses current synthesis Section 5 into reviewer-ready question items
+   * (Part A scenario MCQs + Part B term fill-ins). Legacy 3-MCQ output still parses.
+   */
+  collectReviewerQuestions() {
+    const md = this.currentAnalysis?.markdown || '';
+    const qSection = md.split(/### 5\. 🎯 Licensure/i)[1] || '';
+    const itemSplitter = /\*\*(Question \d+|Fill-in \d+):\*\*/g;
+    const rawItems = [];
+    let lastLabel = null;
+    let lastPos = 0;
+    let im;
+    while ((im = itemSplitter.exec(qSection)) !== null) {
+      if (lastLabel !== null) rawItems.push({ label: lastLabel, block: qSection.slice(lastPos, im.index) });
+      lastLabel = im[1];
+      lastPos = im.index + im[0].length;
+    }
+    if (lastLabel !== null) rawItems.push({ label: lastLabel, block: qSection.slice(lastPos) });
+    if (rawItems.length === 0) {
+      qSection.split(/\*\*Question \d+:\*\*/g).filter(b => b.trim().length > 0)
+        .forEach((block, i) => rawItems.push({ label: `Question ${i + 1}`, block }));
+    }
+
+    return rawItems.map(({ label, block }) => {
+      if (/^Fill-in/i.test(label)) {
+        const ansMatch = block.match(/\*\*Answer:\*\*\s*([^\n]+)/i);
+        const whyMatch = block.match(/\*\*Why:\*\*\s*([\s\S]*?)(?=(?:\*\*(?:Question|Fill-in|Study Next)|$))/i);
+        const snippet = (block.replace(/\*\*Answer:\*\*[\s\S]*$/, '').trim() || '').slice(0, 500);
+        return {
+          question: `${label}: ${snippet}`,
+          front: `${label}: ${snippet}`,
+          answer: ansMatch ? ansMatch[1].trim() : 'See Term Bank',
+          correctAnswer: ansMatch ? ansMatch[1].trim() : '',
+          rationalization: whyMatch ? whyMatch[1].trim() : 'Recall the in-text meaning from the Term Bank.',
+          explanation: whyMatch ? whyMatch[1].trim() : '',
+          options: [],
+          cardKind: 'TERM_FILL_IN'
+        };
+      }
+      const ansMatch = block.match(/\*\*Correct Answer:\*\*\s*([A-D])/i);
+      const rationaleMatch = block.match(/\*\*Pedagogical Rationalization:\*\*\s*([\s\S]*?)(?=(?:\*\*(?:Question|Fill-in|Study Next)|$))/i);
+      const prompt = block.replace(/\*\*Correct Answer:\*\*[\s\S]*$/, '').trim();
+
+      const options = [];
+      const optLines = block.match(/- [A-D]\) .+/g);
+      if (optLines) {
+        optLines.forEach(l => options.push(l.replace(/^- /, '')));
+      }
+
+      return {
+        question: prompt,
+        front: prompt,
+        prompt,
+        options,
+        correctAnswer: ansMatch ? ansMatch[1].toUpperCase() : 'A',
+        rationale: rationaleMatch ? rationaleMatch[1].trim() : 'Active recall practice',
+        rationalization: rationaleMatch ? rationaleMatch[1].trim() : 'Active recall practice',
+        explanation: rationaleMatch ? rationaleMatch[1].trim() : '',
+        cardKind: 'SCENARIO_MCQ'
+      };
+    });
+  }
+
+  /**
+   * Builds TERM_FILL_IN cards only for the terms the learner starred as misses
+   * while self-testing the Term Bank (push-the-misses flow).
+   */
+  buildMissedTermCards() {
+    const cards = [];
+    this.termBankMisses.forEach((meta, term) => {
+      cards.push({
+        cardKind: 'TERM_FILL_IN',
+        question: `Define: ${term}`,
+        front: `Define: ${term}`,
+        answer: term,
+        correctAnswer: term,
+        rationalization: `${meta.meaning || 'Recall the in-text meaning.'}${meta.anchor ? ' — ' + meta.anchor : ''}`,
+        explanation: meta.meaning || '',
+        options: []
+      });
+    });
+    return cards;
+  }
+
+  /**
+   * Dispatches reviewer import + flips the button into a saved state.
+   */
+  dispatchReviewerImport(questions) {
+    if (!questions || questions.length === 0) return;
+    const event = new CustomEvent('pedagogo:save-questions-to-reviewer', {
+      detail: {
+        questions,
+        title: this.currentDoc?.filename || 'Uploaded Reading Document'
+      }
+    });
+    window.dispatchEvent(event);
+  }
+
+  /**
+   * Refreshes the "Push Missed Terms (N)" button visibility + count.
+   */
+  updateMissedPushButton() {
+    const btn = document.getElementById('btn-study-next-misses');
+    if (!btn) return;
+    const n = this.termBankMisses.size;
+    btn.style.display = n > 0 ? '' : 'none';
+    btn.innerHTML = `⭐ <span>Push Missed Terms (${n})</span>`;
   }
 
   /**
@@ -729,9 +869,13 @@ export class DocumentDesk {
 
     const termRowsHtml = rows.map((t, i) => {
       const sourceHtml = this.simpleMarkdown(t.source);
+      const escTerm = this.escapeHtml(t.term);
       return `
         <div class="term-bank-row">
-          <div class="term-bank-term">${this.escapeHtml(t.term)}</div>
+          <div class="term-bank-term">
+            <button type="button" class="btn-term-miss" data-term="${escTerm}" data-meaning="${this.escapeHtml(t.meaning)}" data-anchor="${this.escapeHtml(t.anchor)}" aria-pressed="false" title="Mark this term as a miss if you couldn't recall its meaning">☆</button>
+            <span class="term-bank-term-label">${escTerm}</span>
+          </div>
           <div class="term-bank-meaning">${this.simpleMarkdown(t.meaning)}</div>
           <div class="term-bank-anchor">${this.simpleMarkdown(t.anchor)}</div>
           <div class="term-bank-source">${sourceHtml}</div>
@@ -956,72 +1100,12 @@ export class DocumentDesk {
     const btnSaveQuestions = document.getElementById('btn-save-questions-to-reviewer');
     if (btnSaveQuestions) {
       btnSaveQuestions.addEventListener('click', () => {
-        const md = this.currentAnalysis?.markdown || '';
-        const docTitle = this.currentDoc?.filename || 'Document Reading';
-        
-        // Extract v1.3 Section 5: Part A scenario MCQs + Part B term fill-ins. Legacy 3-MCQ output still parses.
-        const qSection = md.split(/### 5\. 🎯 Licensure/i)[1] || '';
-        const itemSplitter = /\*\*(Question \d+|Fill-in \d+):\*\*/g;
-        const rawItems = [];
-        let lastLabel = null;
-        let lastPos = 0;
-        let im;
-        while ((im = itemSplitter.exec(qSection)) !== null) {
-          if (lastLabel !== null) rawItems.push({ label: lastLabel, block: qSection.slice(lastPos, im.index) });
-          lastLabel = im[1];
-          lastPos = im.index + im[0].length;
+        const parsedQuestions = this.collectReviewerQuestions();
+        if (parsedQuestions.length === 0) {
+          showToast('No practice items found in this analysis.', 'info');
+          return;
         }
-        if (lastLabel !== null) rawItems.push({ label: lastLabel, block: qSection.slice(lastPos) });
-        if (rawItems.length === 0) {
-          qSection.split(/\*\*Question \d+:\*\*/g).filter(b => b.trim().length > 0)
-            .forEach((block, i) => rawItems.push({ label: `Question ${i + 1}`, block }));
-        }
-
-        const parsedQuestions = rawItems.map(({ label, block }) => {
-          if (/^Fill-in/i.test(label)) {
-            const ansMatch = block.match(/\*\*Answer:\*\*\s*([^\n]+)/i);
-            const whyMatch = block.match(/\*\*Why:\*\*\s*([\s\S]*?)(?=(?:\*\*(?:Question|Fill-in|Study Next)|$))/i);
-            return {
-              question: `${label}: ${(block.replace(/\*\*Answer:\*\*[\s\S]*$/, '').trim() || '').slice(0, 500)}`,
-              front: `${label}: ${(block.replace(/\*\*Answer:\*\*[\s\S]*$/, '').trim() || '').slice(0, 500)}`,
-              answer: ansMatch ? ansMatch[1].trim() : 'See Term Bank',
-              correctAnswer: ansMatch ? ansMatch[1].trim() : '',
-              rationalization: whyMatch ? whyMatch[1].trim() : 'Recall the in-text meaning from the Term Bank.',
-              explanation: whyMatch ? whyMatch[1].trim() : '',
-              options: [],
-              cardKind: 'TERM_FILL_IN'
-            };
-          }
-          const ansMatch = block.match(/\*\*Correct Answer:\*\*\s*([A-D])/i);
-          const rationaleMatch = block.match(/\*\*Pedagogical Rationalization:\*\*\s*([\s\S]*?)(?=(?:\*\*(?:Question|Fill-in|Study Next)|$))/i);
-          const prompt = block.replace(/\*\*Correct Answer:\*\*[\s\S]*$/, '').trim();
-          
-          const options = [];
-          const optLines = block.match(/- [A-D]\) .+/g);
-          if (optLines) {
-            optLines.forEach(l => options.push(l.replace(/^- /, '')));
-          }
-
-          return {
-            question: prompt,
-            front: prompt,
-            prompt,
-            options,
-            correctAnswer: ansMatch ? ansMatch[1].toUpperCase() : 'A',
-            rationale: rationaleMatch ? rationaleMatch[1].trim() : 'Active recall practice',
-            rationalization: rationaleMatch ? rationaleMatch[1].trim() : 'Active recall practice',
-            explanation: rationaleMatch ? rationaleMatch[1].trim() : '',
-            cardKind: 'SCENARIO_MCQ'
-          };
-        });
-
-        const event = new CustomEvent('pedagogo:save-questions-to-reviewer', {
-          detail: {
-            questions: parsedQuestions,
-            title: docTitle
-          }
-        });
-        window.dispatchEvent(event);
+        this.dispatchReviewerImport(parsedQuestions);
 
         btnSaveQuestions.innerHTML = '✓ <span>Saved to LET Reviewer!</span>';
         setTimeout(() => {
@@ -1070,6 +1154,78 @@ export class DocumentDesk {
         btnTermBankCover.innerHTML = covered ? '👁️ <span>Reveal Meanings</span>' : '🙈 <span>Cover Meanings — Test Yourself</span>';
       });
     }
+
+    // Term Bank miss-starring: mark terms you couldn't recall while covered
+    document.querySelectorAll('.btn-term-miss').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const term = btn.dataset.term;
+        const row = btn.closest('.term-bank-row');
+        if (!term || !row) return;
+        if (this.termBankMisses.has(term)) {
+          this.termBankMisses.delete(term);
+          row.classList.remove('term-bank-missed');
+          btn.setAttribute('aria-pressed', 'false');
+          btn.textContent = '☆';
+        } else {
+          this.termBankMisses.set(term, { meaning: btn.dataset.meaning || '', anchor: btn.dataset.anchor || '' });
+          row.classList.add('term-bank-missed');
+          btn.setAttribute('aria-pressed', 'true');
+          btn.textContent = '★';
+        }
+        this.updateMissedPushButton();
+      });
+    });
+
+    // Study Next card CTA: Familiarize (Test Term Bank)
+    const btnSnFamiliarize = document.getElementById('btn-study-next-familiarize');
+    if (btnSnFamiliarize) {
+      btnSnFamiliarize.addEventListener('click', () => {
+        const wrap = document.getElementById('term-bank-wrap');
+        const coverBtn = document.getElementById('btn-term-bank-cover');
+        if (wrap && coverBtn && !wrap.classList.contains('term-bank-covered')) {
+          coverBtn.click();
+        }
+        const target = wrap || document.querySelector('.card-chunks');
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        showToast('🌱 Familiarize: recall each meaning aloud. Star (★) the ones you miss!', 'info');
+      });
+    }
+
+    // Study Next card CTA: Memorize (Push All Drills)
+    const btnSnPush = document.getElementById('btn-study-next-push');
+    if (btnSnPush) {
+      btnSnPush.addEventListener('click', () => {
+        const parsed = this.collectReviewerQuestions();
+        if (parsed.length === 0) {
+          showToast('No drills found in this analysis.', 'info');
+          return;
+        }
+        this.dispatchReviewerImport(parsed);
+        btnSnPush.innerHTML = '✓ <span>Pushed!</span>';
+        setTimeout(() => { btnSnPush.innerHTML = '📥 <span>Push All Drills</span>'; }, 2200);
+      });
+    }
+
+    // Study Next card CTA: Push only the missed terms
+    const btnSnMisses = document.getElementById('btn-study-next-misses');
+    if (btnSnMisses) {
+      btnSnMisses.addEventListener('click', () => {
+        if (this.termBankMisses.size === 0) return;
+        const parsed = this.buildMissedTermCards();
+        this.dispatchReviewerImport(parsed);
+        // Clear the stars — those terms are now loaded in the reviewer's Box 1.
+        this.termBankMisses.clear();
+        document.querySelectorAll('.term-bank-row.term-bank-missed').forEach(row => {
+          row.classList.remove('term-bank-missed');
+          const star = row.querySelector('.btn-term-miss');
+          if (star) { star.textContent = '☆'; star.setAttribute('aria-pressed', 'false'); }
+        });
+        this.updateMissedPushButton();
+        btnSnMisses.innerHTML = '✓ <span>Pushed!</span>';
+        setTimeout(() => { this.updateMissedPushButton(); }, 2200);
+      });
+    }
+    this.updateMissedPushButton();
 
     // Upgrade Gemini pill
     const btnUpgradeGemini = document.getElementById('btn-upgrade-gemini-pill');

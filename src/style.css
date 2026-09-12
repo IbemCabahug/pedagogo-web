@@ -3547,6 +3547,101 @@ body.dark-mode .contrastive-matrix-table tr:nth-child(even) {
   border-top: 1px dashed var(--border-light);
 }
 
+/* Miss-starring in the Term Bank (self-test feedback) */
+.btn-term-miss {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 6px 0 0;
+  color: var(--border-light);
+  transition: var(--transition);
+}
+
+.btn-term-miss:hover {
+  color: var(--honey-tertiary);
+  transform: scale(1.15);
+}
+
+.btn-term-miss[aria-pressed="true"] {
+  color: var(--honey-tertiary);
+}
+
+.term-bank-row.term-bank-missed {
+  background: var(--honey-light);
+  border-left: 3px solid var(--honey-tertiary);
+}
+
+.term-bank-row.term-bank-missed .term-bank-term-label {
+  color: var(--terracotta-text);
+}
+
+/* Study Next call-to-action card (Section 5 Part C) */
+.study-next-card {
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, var(--sage-light), var(--surface-subtle));
+  border: 1px solid var(--sage-primary);
+  border-radius: var(--radius-sm);
+}
+
+.study-next-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-next-badge {
+  font-size: 12px;
+  font-weight: 800;
+  background: var(--sage-primary);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.study-next-reco {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-main);
+  margin: 8px 0 10px;
+}
+
+.study-next-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn-study-next {
+  border: 1px solid var(--sage-primary);
+  background: var(--surface-white);
+  color: var(--sage-text);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-study-next:hover {
+  background: var(--sage-primary);
+  color: #fff;
+}
+
+.btn-study-next-misses {
+  border-color: var(--honey-tertiary);
+  background: var(--honey-light);
+  color: var(--terracotta-text);
+}
+
+.btn-study-next-misses:hover {
+  background: var(--honey-tertiary);
+  color: #fff;
+}
+
 /* Verbatim Panel */
 .verbatim-toolbar {
   display: flex;
