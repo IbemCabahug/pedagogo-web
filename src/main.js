@@ -1543,4 +1543,52 @@ FEMALE
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   window.pedagogoApp = new PedagogoDeskApp();
+  initPwaUpdateFlow();
 });
+
+/**
+ * PWA §8.1 — installable Desk + calm offline-ready update flow.
+ * - Registers ./sw.js (same-origin app-shell cache; Gemini/Fonts/P2P stay live).
+ * - On new version: gentle calm-dialog "Refresh to update" (never force-reload mid-work).
+ * - Offline event: soft toast so interns on school WiFi know local data is safe.
+ */
+function initPwaUpdateFlow() {
+  if (!('serviceWorker' in navigator)) return;
+  const isLocalhost = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+  if (!window.isSecureContext && !isLocalhost) return;
+  let refreshed = false;
+  window.addEventListener('offline', () => {
+    try { showToast('You are offline — Desk keeps working, records stay safe on this device.', 'info'); } catch (e) {}
+  });
+  navigator.serviceWorker.register('./sw.js').then((reg) => {
+    const promptUpdate = (worker) => {
+      try {
+        showCalmConfirm({
+          title: 'A calmer Desk is ready 🌿',
+          message: 'A fresh version of Pedagogo Desk was downloaded. Refresh now to use it? Unsaved drafts stay in this device storage.',
+          confirmText: 'Refresh now',
+          cancelText: 'Later',
+          tone: 'calm'
+        }).then((ok) => {
+          if (ok) {
+            refreshed = true;
+            try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch (e) {}
+            window.location.reload();
+          }
+        }).catch(() => {});
+      } catch (e) { /* dialog unavailable — stay on current version */ }
+    };
+    if (reg.waiting) promptUpdate(reg.waiting);
+    reg.addEventListener('updatefound', () => {
+      const worker = reg.installing;
+      if (!worker) return;
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller && !refreshed) {
+          promptUpdate(worker);
+        }
+      });
+    });
+    // Auto-check hourly so lab PCs pick up fixes without manual reload.
+    setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 60 * 1000);
+  }).catch(() => { /* offline-first is progressive enhancement — app works without SW */ });
+}
