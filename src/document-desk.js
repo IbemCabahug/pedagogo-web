@@ -369,6 +369,8 @@ export class DocumentDesk {
           <div class="loading-spinner"></div>
           <h4 id="loading-status-title">Reading Document...</h4>
           <p id="loading-status-desc">Extracting word-for-word text page by page...</p>
+          <p class="loading-elapsed" id="loading-status-elapsed" hidden></p>
+          <button type="button" class="btn-subtle loading-cancel" id="loading-cancel-btn" hidden>✕ Cancel</button>
         </div>
       </div>
     `;
@@ -2111,12 +2113,31 @@ export class DocumentDesk {
     this.render();
   }
 
-  showLoading(title, desc) {
+  showLoading(title, desc, opts = {}) {
     const overlay = document.getElementById('reader-loading-overlay');
     const tEl = document.getElementById('loading-status-title');
     const dEl = document.getElementById('loading-status-desc');
     if (tEl) tEl.textContent = title;
     if (dEl) dEl.textContent = desc;
+    // Sprint UX (Nielsen 1993 / Maister 1985): waits >10 s need running feedback
+    // (elapsed + expected band) and a clearly signposted way to interrupt.
+    this._loadingStartedAt = Date.now();
+    const eEl = document.getElementById('loading-status-elapsed');
+    const cBtn = document.getElementById('loading-cancel-btn');
+    if (cBtn) { cBtn.hidden = !opts.cancellable; cBtn.onclick = opts.onCancel || null; }
+    clearInterval(this._loadingTicker);
+    this._loadingTicker = null;
+    if (eEl) {
+      eEl.hidden = !opts.showTimer;
+      if (opts.showTimer) eEl.textContent = '0s — ' + (opts.timeHint || '');
+      if (opts.showTimer) {
+        this._loadingTicker = setInterval(() => {
+          const s = Math.max(0, Math.round((Date.now() - this._loadingStartedAt) / 1000));
+          const mm = Math.floor(s / 60);
+          eEl.textContent = (mm > 0 ? mm + 'm ' : '') + (s % 60) + 's — ' + (opts.timeHint || '');
+        }, 1000);
+      }
+    }
     if (overlay) overlay.style.display = 'flex';
   }
 
@@ -2128,6 +2149,8 @@ export class DocumentDesk {
   hideLoading() {
     const overlay = document.getElementById('reader-loading-overlay');
     if (overlay) overlay.style.display = 'none';
+    clearInterval(this._loadingTicker);
+    this._loadingTicker = null;
   }
 
   /**
@@ -2256,19 +2279,27 @@ export class DocumentDesk {
     try { forceBasic = sessionStorage.getItem('pedagogo_force_basic') === '1'; } catch (e) {}
 
     const label = type === 'quick' ? 'Quick Look' : (type === 'reviewer' ? 'Reviewer Pack' : 'Study Sheet');
-    this.showLoading(`Generating ${label}...`, type === 'quick'
-      ? 'Reading the file and writing a fast overview...'
-      : 'Running 5-Part Pedagogical Synthesis (Cornell, Chunks, Feynman, Matrix, LET)...');
+    this.showLoading(`Generating ${label}...`, 'Reading the file and preparing the analysis…', {
+      showTimer: true,
+      timeHint: 'AI synthesis usually takes 15–60 s (longer for big or scanned files)',
+      cancellable: true,
+      onCancel: () => {
+        try { ReadingTelemetry.log('summary_cancelled'); } catch (e) {}
+        DocumentSummarizer.cancelActive();
+        this.updateLoadingDesc('Cancelling — your PDF stays unchanged…');
+      }
+    });
+    const onStage = (msg) => this.updateLoadingDesc(msg);
 
     try {
       let analysis;
       if (type === 'quick') {
-        analysis = await DocumentSummarizer.summarizeQuick(this.currentDoc);
+        analysis = await DocumentSummarizer.summarizeQuick(this.currentDoc, onStage);
       } else if (forceBasic) {
         analysis = await DocumentSummarizer.extractPedagogicalAnalysis(this.currentDoc);
         analysis.source = 'LOCAL_EXTRACTIVE_NLP';
       } else {
-        analysis = await DocumentSummarizer.summarize(this.currentDoc);
+        analysis = await DocumentSummarizer.summarize(this.currentDoc, onStage);
       }
       this.currentAnalysis = analysis;
       this.activeSummaryType = analysis.source === 'QUICK_LOOK' ? 'quick' : type;
@@ -2311,7 +2342,10 @@ export class DocumentDesk {
       }
     } catch (err) {
       this.hideLoading();
-      showToast(`${err.message}`, 'warning');
+      const cancelled = (err && err.name === 'AbortError') || /cancel|abort/i.test((err && err.message) || '');
+      showToast(cancelled
+        ? 'Summary cancelled — your PDF is unchanged and safe.'
+        : `${err.message}`, cancelled ? 'info' : 'warning');
     }
   }
 

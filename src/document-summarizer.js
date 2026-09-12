@@ -261,6 +261,29 @@ export class DocumentSummarizer {
   }
 
   /**
+   * Sprint UX — user-visible cancel for long synthesis runs (Nielsen 1993:
+   * operations >10 s need "a clearly signposted way for the user to interrupt
+   * the operation"). Aborting the active controller cancels every in-flight
+   * fetch of the current call, including its silent failovers.
+   */
+  static cancelActive() {
+    if (this._activeCtrl) {
+      try { this._activeCtrl.abort(); } catch { /* already gone */ }
+      this._activeCtrl = null;
+    }
+  }
+
+  /** Stage narrator for the loading overlay (Maister 1985: explained + occupied waits feel shorter). */
+  static _notifyStage(onStage, message) {
+    if (typeof onStage === 'function') { try { onStage(message); } catch { /* stage text is best-effort */ } }
+  }
+
+  /** Cancel mid-flight: rethrow so the Desk can say "cancelled" instead of silently degrading to TextRank. */
+  static _abortOrRethrow(err) {
+    if (err && err.name === 'AbortError') throw err;
+  }
+
+  /**
    * Sprint A — in-app BYOK test call: verifies a pasted key with a tiny
    * Gemini request before saving, so students get instant success/failure.
    * Returns { ok: true, model, route } or { ok: false, message }.
@@ -369,6 +392,7 @@ export class DocumentSummarizer {
     const mdl = this.getOpenAIModel();
     const resp = await fetch(base + '/chat/completions', {
       method: 'POST',
+      signal: (opts && opts.signal) || undefined, // user-visible Cancel (Sprint UX)
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
       body: JSON.stringify((() => {
         const payload = {
@@ -514,13 +538,15 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
    * Sprint B — Quick Look: a lighter, cheaper, faster summary contract.
    * Falls back to a compact local extract when no key exists.
    */
-  static async summarizeQuick(extractedDoc) {
+  static async summarizeQuick(extractedDoc, onStage) {
     // OpenAI-compatible BYOK slot (incl. StepFun): quick prompt, smaller budget.
     if (this.getProvider() === 'openai_compat' && this.getOpenAIKey().trim()) {
-      const text = await this.completeWithOpenAI(this.getQuickPrompt() + '\n\n' + this._buildQuickHeader(extractedDoc), { maxTokens: 2048 });
+      const ctrl = this._activeCtrl = new AbortController();
+      this._notifyStage(onStage, 'Sending the document text to your Custom AI…');
+      const text = await this.completeWithOpenAI(this.getQuickPrompt() + '\n\n' + this._buildQuickHeader(extractedDoc), { maxTokens: 2048, signal: ctrl.signal });
       return { source: 'QUICK_LOOK', modelName: this.getOpenAIModel(), markdown: text, analyzedAt: new Date().toISOString() };
     }
-    const result = await this._runGeminiForPrompt(this.getQuickPrompt() + '\n\n' + this._buildQuickHeader(extractedDoc), extractedDoc, 2048);
+    const result = await this._runGeminiForPrompt(this.getQuickPrompt() + '\n\n' + this._buildQuickHeader(extractedDoc), extractedDoc, 2048, onStage);
     if (result) {
       return { source: 'QUICK_LOOK', modelName: result.modelName, isMultimodal: result.isMultimodal, markdown: result.text, analyzedAt: new Date().toISOString() };
     }
@@ -529,7 +555,7 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
     return quickFallback;
   }
 
-  static async summarize(extractedDoc) {
+  static async summarize(extractedDoc, onStage) {
     // OpenAI-compatible BYOK slot: same synthesis prompt, chat-completions transport.
     if (this.getProvider() === 'openai_compat') {
       const oKey = this.getOpenAIKey().trim();
@@ -540,8 +566,10 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
         return this.extractPedagogicalAnalysis(extractedDoc);
       }
       const oModel = this.getOpenAIModel();
+      const oCtrl = this._activeCtrl = new AbortController();
+      this._notifyStage(onStage, 'Sending the document text to your Custom AI…');
       const oPrompt = this.getSystemPrompt() + "\n\nHere is the educational reading material to analyze:\n**Document Title:** " + extractedDoc.filename + " (" + extractedDoc.fileType + ")\n**Total Units:** " + extractedDoc.totalUnits + " " + extractedDoc.unitLabel + "\n\n**Verbatim Document Content:**\n" + extractedDoc.rawText.slice(0, 120000);
-      const synthesis = await this.completeWithOpenAI(oPrompt, { maxTokens: 8192 });
+      const synthesis = await this.completeWithOpenAI(oPrompt, { maxTokens: 8192, signal: oCtrl.signal });
       return { source: 'OPENAI_COMPAT_API', modelName: oModel, markdown: synthesis, analyzedAt: new Date().toISOString() };
     }
     const apiKey = this.getApiKey();
@@ -558,6 +586,7 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
     // Sprint A.5: selected model first, then silent legacy fallbacks.
     const modelsToTry = [selectedModel, ...this.getLegacyFallbackModels().filter(m => m !== selectedModel)];
     this._sawQuota429 = false; // honest quota UX: reset per run, set on any 429 (see fallback return)
+    const ctrl = this._activeCtrl = new AbortController(); // Sprint UX: user-visible Cancel
 
     // Build prompt payload: check if multimodal inline document is available (PDF or Image)
     const canUseMultimodal = Boolean(extractedDoc.base64Data && (extractedDoc.fileType === 'PDF' || extractedDoc.fileType === 'IMAGE'));
@@ -586,6 +615,7 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
 
     // Sprint P0: try each model through the Interactions API first (GA June 2026),
     // then silently fail over to legacy generateContent on the same model.
+    this._notifyStage(onStage, canUseMultimodal ? 'Uploading the PDF/image to Gemini…' : 'Sending the document text to Gemini…');
     for (const model of modelsToTry) {
       // Reuse the first text part (system prompt + doc header) so both routes see identical wording.
       const prompt = parts[0] && parts[0].text ? parts[0].text : '';
@@ -618,11 +648,14 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
       ];
 
       for (const route of routes) {
+        this._notifyStage(onStage, 'Contacting ' + (this.getAvailableModels().find(m => m.id === model)?.name || model)
+          + (route.name === 'interactions' ? ' — main route…' : ' — backup route…'));
         try {
           const response = await fetch(route.endpoint, {
             method: 'POST',
             headers: this.getGeminiHeaders(apiKey),
-            body: JSON.stringify(route.body)
+            body: JSON.stringify(route.body),
+            signal: ctrl.signal
           });
 
           if (!response.ok) {
@@ -650,6 +683,7 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
             };
           }
         } catch (err) {
+          this._abortOrRethrow(err); // Cancel pressed: stop everything — never fall through to more routes
           console.warn(`Fetch error for model ${model} via ${route.name}:`, err);
         }
       }
@@ -672,10 +706,11 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
   }
 
   /** Shared Gemini text call used by Quick Look only (never touches summarize()). */
-  static async _runGeminiForPrompt(systemPrompt, extractedDoc, maxTokens) {
+  static async _runGeminiForPrompt(systemPrompt, extractedDoc, maxTokens, onStage) {
     const apiKey = this.getApiKey();
     if (!apiKey) return null;
     this._sawQuota429 = false; // reset per run (Quick Look path)
+    const ctrl = this._activeCtrl = new AbortController(); // Sprint UX: user-visible Cancel
     const selectedModel = this.getSelectedModel();
     const modelsToTry = [selectedModel, ...this.getLegacyFallbackModels().filter(m => m !== selectedModel)];
     const canUseMultimodal = Boolean(extractedDoc.base64Data && (extractedDoc.fileType === 'PDF' || extractedDoc.fileType === 'IMAGE'));
@@ -689,6 +724,7 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
     };
     for (const model of modelsToTry) {
       // Sprint P0: Interactions first, legacy generateContent as silent failover.
+      this._notifyStage(onStage, 'Asking Gemini for a quick overview…');
       const routes = [
         {
           name: 'interactions',
@@ -713,7 +749,8 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
           const response = await fetch(route.endpoint, {
             method: 'POST',
             headers: this.getGeminiHeaders(apiKey),
-            body: JSON.stringify(route.body)
+            body: JSON.stringify(route.body),
+            signal: ctrl.signal
           });
           if (!response.ok) {
             if (response.status === 429) this._sawQuota429 = true;
@@ -729,6 +766,7 @@ Maintain an encouraging, rigorous tone throughout. Total response <= 1100 words.
             return { text: text.trim(), modelName: modelMeta?.name || model, isMultimodal: canUseMultimodal };
           }
         } catch (err) {
+          this._abortOrRethrow(err); // Cancel pressed: stop immediately
           console.warn(`Gemini quick (${model} via ${route.name}) fetch error:`, err);
         }
       }

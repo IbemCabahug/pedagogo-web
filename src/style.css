@@ -3091,6 +3091,21 @@ body.dark-mode .zen-fullscreen-overlay {
   color: var(--text-muted);
 }
 
+/* Sprint UX — staged loading: elapsed timer + cancel (Nielsen 1993 >10 s guidance,
+   Maister 1985 explained/occupied waits). Skeleton screens intentionally NOT used:
+   NN/g limits them to full-page loads; AI synthesis is a process → steps + cancel. */
+.loading-elapsed {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted-ink, #5b6b60);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.loading-cancel {
+  margin-top: 12px;
+  pointer-events: auto;
+}
+
 /* Loading Overlay */
 .reader-loading-overlay {
   position: fixed;
