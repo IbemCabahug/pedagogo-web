@@ -15,6 +15,8 @@ export class SyncManager {
     this.peer = null;
     this.activeConn = null;
     this.sessionId = this.generateSessionId();
+    this.undoSnapshot = null;   // in-memory pre-import state (session undo)
+    this.undoPersisted = false; // true when a durable snapshot survived in localStorage
 
     this.initElements();
     this.initPeer();
@@ -23,6 +25,11 @@ export class SyncManager {
 
     // Re-render stats if any data changed or restored
     window.addEventListener('pedagogo:data-restored', () => this.renderBackupStats());
+
+    // Re-surface the Undo bar after a reload if a durable restore snapshot survived
+    try {
+      if (localStorage.getItem('pedagogo_undo_snapshot_v1')) this.showUndoBar();
+    } catch (e) { /* non-fatal: undo stays available for the current session */ }
   }
 
   generateSessionId() {
@@ -180,7 +187,7 @@ export class SyncManager {
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target.result);
-        this.handleIncomingPayload(data);
+        this.handleIncomingPayload(data, { fileName: file.name || 'backup.json' });
       } catch (err) {
         showToast('Invalid file format. Please drop a valid Pedagogo JSON or .pedagogo backup file.', 'warning');
       }
@@ -188,47 +195,14 @@ export class SyncManager {
     reader.readAsText(file);
   }
 
-  handleIncomingPayload(rawPayload) {
+  handleIncomingPayload(rawPayload, meta) {
     try {
       const data = typeof rawPayload === 'string' ? JSON.parse(rawPayload) : rawPayload;
       if (!data) throw new Error('Empty payload');
 
-      // CASE 1: Full System Backup Archive
+      // CASE 1: Full System Backup Archive → preview report first (safety gate)
       if (data.stores || data.app === 'Pedagogo Desk' || (data.version && data.version >= 2)) {
-        const stores = data.stores || {};
-        let restoredCount = 0;
-
-        if (stores.pedagogo_tasks && !stores.pedagogo_academic_tasks) stores.pedagogo_academic_tasks = stores.pedagogo_tasks;
-        if (stores.pedagogo_flashcards && !stores.pedagogo_let_cards) stores.pedagogo_let_cards = stores.pedagogo_flashcards;
-        Object.entries(stores).forEach(([key, val]) => {
-          if (val !== undefined && val !== null) {
-            localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
-            restoredCount++;
-          }
-        });
-
-        this.updateStatus('✅ Full Archive Restored!', '#10B981');
-        this.renderBackupStats();
-
-        // Dispatch notification so main.js and components refresh
-        window.dispatchEvent(new CustomEvent('pedagogo:data-restored', { detail: data }));
-
-        if (stores.pedagogo_schedule && typeof this.onDataReceived === 'function') {
-          const sched = typeof stores.pedagogo_schedule === 'string'
-            ? JSON.parse(stores.pedagogo_schedule)
-            : stores.pedagogo_schedule;
-          this.onDataReceived(sched);
-        }
-
-        const summary = data.summary || {};
-        showToast(
-          `Pedagogo Desk Archive Restored!\n` +
-          `• ${summary.flashcards ?? 0} LET Flashcards • ${summary.fieldStudyEntries ?? 0} FS Episodes\n` +
-          `• ${summary.tasks ?? 0} Tasks • ${summary.classrooms ?? 0} Classes • ${summary.subjects ?? 0} Subjects\n` +
-          `• ${summary.readingSessions ?? 0} Reading Desk Sessions`,
-          'success',
-          5500
-        );
+        this.presentImportReport(data, meta);
         return;
       }
 
@@ -253,6 +227,251 @@ export class SyncManager {
       console.error('Failed to parse incoming payload:', e);
       showToast('Could not parse file. Please verify it is a valid Pedagogo backup.', 'warning');
     }
+  }
+
+  // =========================================================
+  // Safety Net: Import Preview Report + One-Click Undo
+  // =========================================================
+
+  static STORE_META = {
+    pedagogo_schedule: { label: 'Weekly Schedule', icon: '🗓️' },
+    pedagogo_academic_tasks: { label: 'Tasks & IMs', icon: '✏️' },
+    pedagogo_tasks: { label: 'Tasks & IMs (legacy)', icon: '✏️' },
+    pedagogo_classrooms: { label: 'Classes', icon: '👥' },
+    pedagogo_students: { label: 'Students', icon: '🧑‍🎓' },
+    pedagogo_enrollments: { label: 'Enrollments', icon: '🔗' },
+    pedagogo_let_cards: { label: 'LET Cards', icon: '📝' },
+    pedagogo_flashcards: { label: 'LET Cards (legacy)', icon: '📝' },
+    pedagogo_let_flags: { label: 'LET Flags', icon: '🚩' },
+    pedagogo_let_logs: { label: 'Drill Logs', icon: '📈' },
+    pedagogo_anecdotal_records: { label: 'Anecdotal Notes', icon: '📔' },
+    pedagogo_fs_entries: { label: 'FS Episodes', icon: '🏫' },
+    pedagogo_saved_lp: { label: 'Saved Lesson Plan', icon: '🌱' },
+    pedagogo_reading_history: { label: 'Reading History', icon: '🕘' },
+    pedagogo_reading_sessions: { label: 'Desk Sessions', icon: '📖' },
+    pedagogo_reading_sync: { label: 'Sync Stamp', icon: '🔁' },
+    pedagogo_attendance_sessions: { label: 'Roll Calls', icon: '📋' },
+    pedagogo_assessments: { label: 'Assessments', icon: '📊' },
+    pedagogo_lp_plans: { label: 'Lesson Plan Library', icon: '📚' },
+    pedagogo_lp_draft: { label: 'Plan Draft', icon: '🌱' }
+  };
+
+  /** Count records inside any stored value (array, object-with-arrays, or scalar). */
+  static countIncoming(value) {
+    if (value === undefined || value === null) return 0;
+    if (Array.isArray(value)) return value.length;
+    if (typeof value === 'object') {
+      for (const arrKey of ['plans', 'assessments', 'sessions', 'subjects', 'scores', 'entries']) {
+        if (Array.isArray(value[arrKey])) return value[arrKey].length;
+      }
+      return Object.keys(value).length;
+    }
+    return 1;
+  }
+
+  /** Record count currently stored in Desk for a single key. */
+  static countStore(key) {
+    const raw = localStorage.getItem(key);
+    if (!raw) return 0;
+    try { return SyncManager.countIncoming(JSON.parse(raw)); } catch { return 1; }
+  }
+
+  fmtTime(iso) {
+    try {
+      return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch { return ''; }
+  }
+
+  escHtml(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  presentImportReport(data, meta) {
+    const card = document.getElementById('import-report-card');
+    if (!card) return;
+
+    const stores = data.stores || {};
+    const labelMeta = SyncManager.STORE_META;
+    const labelOrder = Object.keys(labelMeta);
+    const dataKeys = Object.keys(stores).sort((a, b) => {
+      const ia = labelOrder.indexOf(a);
+      const ib = labelOrder.indexOf(b);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+
+    let incomingTotal = 0;
+    let overwriteCount = 0;
+    let newCount = 0;
+    const rows = [];
+    for (const key of dataKeys) {
+      const incoming = SyncManager.countIncoming(stores[key]);
+      const current = SyncManager.countStore(key);
+      incomingTotal += incoming;
+      let action = '<span class="imp-act-skip">—</span>';
+      let rowClass = '';
+      if (incoming > 0 && current > 0) {
+        action = '<span class="imp-act-update">🔁 Update</span>';
+        rowClass = 'imp-row-warn';
+        overwriteCount++;
+      } else if (incoming > 0) {
+        action = '<span class="imp-act-new">✨ New</span>';
+        newCount++;
+      }
+      const meta2 = labelMeta[key] || { label: key.replace('pedagogo_', '').replace(/_/g, ' '), icon: '📄' };
+      rows.push(`<tr class="${rowClass}"><td>${meta2.icon} ${this.escHtml(meta2.label)}</td><td class="imp-num">${incoming}</td><td class="imp-num">${current}</td><td>${action}</td></tr>`);
+    }
+
+    const fileName = this.escHtml(meta?.fileName || 'backup');
+    const exportedAt = data.exportedAt ? this.escHtml(String(data.exportedAt).replace('T', ' ').slice(0, 19)) : 'unknown';
+    const warnHtml = incomingTotal === 0
+      ? `<div class="import-warning-chip imp-chip-empty">🕊️ This backup contains no records to restore — nothing would change.</div>`
+      : (overwriteCount > 0
+        ? `<div class="import-warning-chip">⚠️ Desk already holds data in <strong>${overwriteCount}</strong> module(s). Importing merges the file's version over those modules — nothing is deleted. A snapshot of the current Desk state is kept so you can undo afterwards.</div>`
+        : `<div class="import-warning-chip imp-chip-calm">🌿 This backup adds <strong>${newCount}</strong> new module(s). Existing Desk data stays untouched — and you can still undo after.</div>`);
+
+    card.hidden = false;
+    card.innerHTML = `
+      <div class="import-report-head">
+        <span class="import-file-chip">📄 ${fileName}</span>
+        <span class="import-meta-chip">Exported ${exportedAt} • v${this.escHtml(String(data.version || 2))} • ${incomingTotal} records incoming</span>
+      </div>
+      ${warnHtml}
+      <table class="import-report-table">
+        <thead><tr><th>Module</th><th>In this file</th><th>On Desk now</th><th>Action</th></tr></thead>
+        <tbody>${rows.join('')}</tbody>
+      </table>
+      <div class="import-report-actions">
+        <button type="button" class="btn-primary" id="btn-confirm-restore">✓ Restore &amp; keep an Undo copy</button>
+        <button type="button" class="btn-subtle" id="btn-cancel-import">✕ Cancel import</button>
+      </div>`;
+
+    card.querySelector('#btn-confirm-restore').addEventListener('click', () => this.applyRestore(data, meta));
+    card.querySelector('#btn-cancel-import').addEventListener('click', () => {
+      this.hideImportReport();
+      showToast('Import canceled — nothing was changed.', 'info');
+    });
+  }
+
+  hideImportReport() {
+    const card = document.getElementById('import-report-card');
+    if (card) { card.hidden = true; card.innerHTML = ''; }
+  }
+
+  applyRestore(data, meta) {
+    const stores = data.stores || {};
+    if (stores.pedagogo_tasks && !stores.pedagogo_academic_tasks) stores.pedagogo_academic_tasks = stores.pedagogo_tasks;
+    if (stores.pedagogo_flashcards && !stores.pedagogo_let_cards) stores.pedagogo_let_cards = stores.pedagogo_flashcards;
+
+    // 1. Snapshot current raw values for every key we are about to touch.
+    const applyKeys = Object.keys(stores);
+    const snapshot = {
+      savedAt: new Date().toISOString(),
+      fileName: meta?.fileName || 'backup',
+      restore: {}
+    };
+    applyKeys.forEach((key) => { snapshot.restore[key] = localStorage.getItem(key); });
+    this.undoSnapshot = snapshot;
+    this.undoPersisted = false;
+    try {
+      localStorage.setItem('pedagogo_undo_snapshot_v1', JSON.stringify(snapshot));
+      this.undoPersisted = true;
+    } catch (e) {
+      this.undoPersisted = false; // too large for localStorage → session-only undo
+    }
+
+    // 2. Write the archive stores.
+    let restoredCount = 0;
+    applyKeys.forEach((key) => {
+      const val = stores[key];
+      if (val !== undefined && val !== null) {
+        localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
+        restoredCount++;
+      }
+    });
+
+    this.hideImportReport();
+    this.updateStatus('✅ Full Archive Restored!', '#10B981');
+    this.renderBackupStats();
+    this.showUndoBar();
+
+    window.dispatchEvent(new CustomEvent('pedagogo:data-restored', { detail: data }));
+
+    if (stores.pedagogo_schedule && typeof this.onDataReceived === 'function') {
+      const sched = typeof stores.pedagogo_schedule === 'string'
+        ? JSON.parse(stores.pedagogo_schedule)
+        : stores.pedagogo_schedule;
+      this.onDataReceived(sched);
+    }
+
+    const summary = data.summary || {};
+    const fileLabel = meta?.fileName ? `"${meta.fileName}"` : 'archive';
+    showToast(
+      `Desk restored from ${fileLabel}: ` +
+      `${summary.flashcards ?? 0} LET • ${summary.fieldStudyEntries ?? 0} FS • ` +
+      `${summary.tasks ?? 0} Tasks • ${summary.classrooms ?? 0} Classes • ${summary.readingSessions ?? 0} Sessions.` +
+      (this.undoPersisted ? ' Undo kept until you decide.' : ' Session undo is ready.'),
+      'success', 5500
+    );
+  }
+
+  showUndoBar() {
+    const bar = document.getElementById('restore-undo-bar');
+    if (!bar) return;
+    let snap = this.undoSnapshot;
+    if (!snap) {
+      try {
+        const raw = localStorage.getItem('pedagogo_undo_snapshot_v1');
+        snap = raw ? JSON.parse(raw) : null;
+      } catch { snap = null; }
+    }
+    const name = this.escHtml((snap && snap.fileName) || 'a backup');
+    const at = snap && snap.savedAt ? this.fmtTime(snap.savedAt) : '';
+    bar.hidden = false;
+    bar.innerHTML = `
+      <div class="restore-undo-inner">
+        <span>🔄 Imported <strong>${name}</strong>${at ? ` at ${at}` : ''} — the previous Desk state was saved. You can undo anytime.</span>
+        <button type="button" class="btn-subtle" id="btn-undo-restore">↩ Undo restore</button>
+      </div>`;
+    bar.querySelector('#btn-undo-restore').addEventListener('click', () => this.undoLastRestore());
+  }
+
+  hideUndoBar() {
+    const bar = document.getElementById('restore-undo-bar');
+    if (bar) { bar.hidden = true; bar.innerHTML = ''; }
+  }
+
+  undoLastRestore() {
+    let snap = this.undoSnapshot;
+    if (!snap) {
+      try {
+        const raw = localStorage.getItem('pedagogo_undo_snapshot_v1');
+        snap = raw ? JSON.parse(raw) : null;
+      } catch { snap = null; }
+    }
+    if (!snap || !snap.restore) {
+      showToast('Nothing to undo — no prior restore was found.', 'info');
+      return;
+    }
+
+    let restored = 0;
+    Object.entries(snap.restore).forEach(([key, rawVal]) => {
+      if (rawVal === null || rawVal === undefined) {
+        try { localStorage.removeItem(key); } catch { /* non-fatal */ }
+      } else {
+        try { localStorage.setItem(key, rawVal); restored++; } catch { /* non-fatal */ }
+      }
+    });
+
+    this.undoSnapshot = null;
+    try { localStorage.removeItem('pedagogo_undo_snapshot_v1'); } catch { /* non-fatal */ }
+    this.undoPersisted = false;
+    this.hideUndoBar();
+    this.hideImportReport();
+    this.updateStatus('↩ Previous Desk state restored', '#10B981');
+    this.renderBackupStats();
+    window.dispatchEvent(new CustomEvent('pedagogo:data-restored', { detail: { undo: true } }));
+    showToast(`↩ Restored the previous Desk state${(snap.savedAt ? ` from ${this.fmtTime(snap.savedAt)}` : '')} — ${restored} module(s) rolled back.`, 'success', 4500);
   }
 
   /**

@@ -49,6 +49,7 @@
         </div>
 
         <div class="header-actions">
+          <button class="btn-icon" id="btn-global-search" title="Search across Desk (Ctrl+K)" aria-label="Search across Desk">🔍</button>
           <div class="sync-indicator" id="sync-status-pill" title="Local storage active — records safely preserved on this device">
             <span class="status-dot"></span>
             <span id="sync-status-text">Local Storage</span>
@@ -963,6 +964,16 @@
                 <span>Browse Backup File</span>
                 <input type="file" id="manual-file-input" accept=".json,.pedagogo" style="display: none;">
               </label>
+            </div>
+
+            <!-- Import Preview Report (rendered by SyncManager before restore) -->
+            <div class="import-report-card" id="import-report-card" hidden>
+              <!-- SyncManager injects: file meta, per-module diff table, Restore/Cancel -->
+            </div>
+
+            <!-- One-click Undo bar after a restore (persists across reloads via snapshot) -->
+            <div class="restore-undo-bar" id="restore-undo-bar" hidden>
+              <!-- SyncManager injects: imported-file name + Undo Button -->
             </div>
 
             <hr class="divider">

@@ -15,6 +15,7 @@ import { AttendanceTracker } from './attendance-tracker.js';
 import { AssessmentTracker } from './assessment-tracker.js';
 import { LessonPlanBuilder } from './lesson-plan-builder.js';
 import { AnecdotalRecordTracker } from './anecdotal-record-tracker.js';
+import { GlobalSearch } from './global-search.js';
 import { showToast } from './toast.js';
 import { showCalmConfirm } from './calm-dialog.js';
 
@@ -59,7 +60,21 @@ class PedagogoDeskApp {
 
     window.addEventListener('pedagogo:switch-tab', (e) => {
       if (e.detail?.tab) {
+        if (e.detail.perspective) {
+          this.setPerspective(e.detail.perspective, false);
+        }
         this.switchTab(e.detail.tab);
+      }
+    });
+
+    // Global Search (Ctrl+K) — safety-net cross-module search palette
+    this.globalSearch = new GlobalSearch();
+    this.globalSearch.init();
+
+    // Deep-link: open a specific saved plan from Global Search results
+    window.addEventListener('pedagogo:plan-open', (e) => {
+      if (this.planBuilder && e.detail?.id) {
+        this.planBuilder.openPlan(e.detail.id);
       }
     });
 
