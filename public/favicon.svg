@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient: Forest Sage to Deep Pine -->
+    <linearGradient id="pedagogoBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#32593E"/>
+      <stop offset="50%" stop-color="#24442E"/>
+      <stop offset="100%" stop-color="#162D1E"/>
+    </linearGradient>
+
+    <!-- Page Highlights -->
+    <linearGradient id="pageLight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#FAF5EB"/>
+    </linearGradient>
+    <linearGradient id="pageShade" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#EFE7D8"/>
+      <stop offset="100%" stop-color="#DDD3C0"/>
+    </linearGradient>
+
+    <!-- Leaf Gradients -->
+    <linearGradient id="leafGradLeft" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3B7D4D"/>
+      <stop offset="100%" stop-color="#6DC885"/>
+    </linearGradient>
+    <linearGradient id="leafGradRight" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4E9963"/>
+      <stop offset="100%" stop-color="#8FE4A5"/>
+    </linearGradient>
+
+    <!-- Spark Glow -->
+    <radialGradient id="sparkHalo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFD166" stop-opacity="0.9"/>
+      <stop offset="40%" stop-color="#F78C26" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#E26A1A" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="folioShadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#08140C" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle Container -->
+  <rect width="512" height="512" rx="116" fill="url(#pedagogoBg)"/>
+  
+  <!-- Subtle ambient inner border -->
+  <rect x="10" y="10" width="492" height="492" rx="108" fill="none" stroke="rgba(255, 255, 255, 0.12)" stroke-width="4"/>
+
+  <!-- Illustration Group with Soft Shadow -->
+  <g filter="url(#folioShadow)">
+    <!-- Base Page Stack / Depth -->
+    <path d="M 256,410 C 205,402 140,386 98,364 C 96,374 97,384 102,390 C 145,411 210,425 256,430 Z" fill="url(#pageShade)"/>
+    <path d="M 256,410 C 307,402 372,386 414,364 C 416,374 415,384 410,390 C 367,411 302,425 256,430 Z" fill="url(#pageShade)"/>
+    
+    <!-- Terracotta Binding Notch -->
+    <path d="M 248,420 Q 256,434 264,420 Q 256,425 248,420 Z" fill="#BF5F3E"/>
+
+    <!-- Open Folio Pages -->
+    <!-- Left Page -->
+    <path d="M 256,334 C 208,318 142,306 96,322 C 92,324 88,330 88,338 C 88,348 92,358 98,364 C 140,386 205,402 256,410 Z" fill="url(#pageLight)"/>
+    <!-- Right Page -->
+    <path d="M 256,334 C 304,318 370,306 416,322 C 420,324 424,330 424,338 C 424,348 420,358 414,364 C 372,386 307,402 256,410 Z" fill="url(#pageLight)"/>
+
+    <!-- Folio Crease / Gutter -->
+    <path d="M 256,334 L 256,410" stroke="#D1C7B4" stroke-width="2.5" stroke-linecap="round"/>
+
+    <!-- Lesson Planning Lines (Soft Scribe) -->
+    <path d="M 136,342 C 170,340 210,350 236,360" stroke="#8EA593" stroke-width="3" stroke-linecap="round" opacity="0.45"/>
+    <path d="M 142,360 C 172,358 208,367 236,376" stroke="#8EA593" stroke-width="3" stroke-linecap="round" opacity="0.45"/>
+    <path d="M 376,342 C 342,340 302,350 276,360" stroke="#8EA593" stroke-width="3" stroke-linecap="round" opacity="0.45"/>
+    <path d="M 370,360 C 340,358 304,367 276,376" stroke="#8EA593" stroke-width="3" stroke-linecap="round" opacity="0.45"/>
+
+    <!-- Sprout Stem -->
+    <path d="M 256,356 C 256,310 255,250 256,204" stroke="#3D7A4D" stroke-width="14" stroke-linecap="round"/>
+
+    <!-- Left Sprouting Leaf -->
+    <path d="M 256,260 C 220,260 156,234 136,182 C 124,150 142,108 174,102 C 204,96 238,138 256,204 Z" fill="url(#leafGradLeft)"/>
+    <path d="M 256,245 C 220,230 180,185 174,112" stroke="rgba(255, 255, 255, 0.45)" stroke-width="3.5" stroke-linecap="round"/>
+
+    <!-- Right Sprouting Leaf -->
+    <path d="M 256,252 C 294,252 360,224 378,172 C 390,138 370,98 338,94 C 306,90 274,132 256,198 Z" fill="url(#leafGradRight)"/>
+    <path d="M 256,238 C 294,222 334,178 338,104" stroke="rgba(255, 255, 255, 0.45)" stroke-width="3.5" stroke-linecap="round"/>
+
+    <!-- Teacher's Spark: Glowing Morning Star / Spark of Wisdom -->
+    <!-- Ambient Halo -->
+    <circle cx="256" cy="100" r="54" fill="url(#sparkHalo)"/>
+    
+    <!-- 8-Point Faceted Radiant Star -->
+    <!-- Primary 4-point star -->
+    <path d="M 256,66 L 264,94 L 292,100 L 264,106 L 256,134 L 248,106 L 220,100 L 248,94 Z" fill="#F7941E"/>
+    <!-- Diagonal secondary 4-point star -->
+    <path d="M 256,76 L 262,95 L 280,100 L 262,105 L 256,124 L 250,105 L 232,100 L 250,95 Z" fill="#FDB863"/>
+    <!-- Center Core Spark -->
+    <circle cx="256" cy="100" r="7" fill="#FFFFFF"/>
+  </g>
+</svg>
