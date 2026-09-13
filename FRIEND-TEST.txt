@@ -1,0 +1,101 @@
+==========================================================
+ PEDAGOGO DESK - FRIEND TEST (about 15 minutes, one PDF)
+==========================================================
+
+Hi! Thanks for helping me test my capstone project. :)
+
+WHAT IT IS
+----------
+Pedagogo Desk is a free study tool that runs in your browser.
+You give it a subject PDF (a chapter, a handout, a reviewer)
+and it turns it into a calm study session: a quick summary,
+key terms, little practice checks, and a review scheduler.
+
+THE RULES (so the test is honest)
+---------------------------------
+1. Use your own LAPTOP/PC (not phone - this tool is for PC).
+2. Use a subject PDF you already have for school (15-25 pages
+   is ideal). Nothing confidential please - your PDF goes to
+   Google's AI for one reading step.
+3. Try everything ALONE first. If you are stuck for more than
+   a minute, that is a finding! Write it down and move on.
+4. There are no wrong answers. Confusion = useful data. :)
+
+BEFORE YOU START (2 minutes)
+----------------------------
+[ ] Open this link in Chrome or Edge:
+    https://pedagogo-dashboard.vercel.app
+[ ] If it asks for an AI key: message me, I will send you an
+    invite key to paste in.
+[ ] Have your PDF ready where you can find it.
+
+PART 1 - FIRST TOUCH (on purpose, no instructions!)
+---------------------------------------------------
+[ ] Open the link. Just look around for a moment.
+[ ] Where would you click to add your PDF? (Do it.)
+
+PART 2 - GENERATE (about 5 minutes)
+-----------------------------------
+[ ] Upload your PDF.
+[ ] A question will ask what kind of studying you want.
+    Pick whichever makes sense to you (remember which one
+    you picked and why - I will ask).
+[ ] Wait for the result sheet. While waiting: did the wait
+    feel okay? Too long? Confusing?
+
+PART 3 - READ LIKE A STUDENT (about 5 minutes)
+----------------------------------------------
+[ ] Find the short summary (TL;DR). Is it actually short?
+[ ] Find the key terms list. Try the little test buttons.
+[ ] Somewhere there is a banner about checking the ORIGINAL
+    pages. Open at least one page citation - did it jump to
+    the right place?
+[ ] Find the card that tells you what to study next.
+    Follow what it says.
+
+PART 4 - PRACTICE + OFFLINE (about 3 minutes)
+---------------------------------------------
+[ ] Push the practice items to the reviewer (it will ask).
+[ ] Try one flashcard / question there.
+[ ] Try to INSTALL it as an app, if you can find how.
+[ ] Turn OFF your wifi, then reload the page.
+    Does it still open? Then turn wifi back on.
+
+==========================================================
+ THE FEEDBACK - copy everything below, fill it in, and
+ send it back to me. Honest > nice. :)
+==========================================================
+
+PEDAGOGO FRIEND TEST - [your name here]
+
+STEP SCORES (write one per line)
+GOOD / OK / CONFUSED / GAVE UP
+ 1. Finding where to upload:          ______
+ 2. Understanding the goal question:  ______
+ 3. Waiting for the result:           ______
+ 4. Understanding the summary:        ______
+ 5. Key terms + little tests:         ______
+ 6. Check-the-original banner:        ______
+ 7. Study Next card:                  ______
+ 8. Pushing to the reviewer:          ______
+ 9. Trying a flashcard:               ______
+10. Finding install / offline:        ______
+
+HOW HARD WAS IT? (0 = super easy, 100 = super hard)
+ Mental effort:      ______
+ Frustration level:  ______
+ Overall workload:   ______
+
+THREE QUESTIONS (one honest sentence each)
+1. What almost made you give up?
+   ________________________________________________
+2. What did you skip or not bother trying?
+   ________________________________________________
+3. Would you use this again for real studying?
+   Why / why not?
+   ________________________________________________
+
+ANYTHING ELSE? (bugs, typos, ideas - anything counts)
+________________________________________________
+
+Thank you!! This genuinely helps. :)
