@@ -400,7 +400,7 @@ class PedagogoDeskApp {
   initSpark() {
     const quoteEl = document.getElementById('spark-quote');
     const authorEl = document.getElementById('spark-author');
-    const refreshBtn = document.getElementById('btn-refresh-spark');
+    const banner = document.getElementById('spark-banner');
 
     const renderSpark = () => {
       const spark = this.sparks[this.currentSparkIndex];
@@ -408,14 +408,41 @@ class PedagogoDeskApp {
       if (authorEl) authorEl.textContent = `— ${spark.author}`;
     };
 
+    const nextSpark = () => {
+      this.currentSparkIndex = (this.currentSparkIndex + 1) % this.sparks.length;
+      renderSpark();
+    };
+
     renderSpark();
 
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', () => {
-        this.currentSparkIndex = (this.currentSparkIndex + 1) % this.sparks.length;
-        renderSpark();
+    // The whole banner shuffles on click (replaces the old Shuffle button —
+    // less chrome, same action). Keyboard: Enter or Space, since a native
+    // button was traded for a clickable section.
+    if (banner) {
+      const onActivate = () => {
+        nextSpark();
+        restartAutoShuffle(); // manual pick resets the 30s rhythm
+      };
+      banner.addEventListener('click', onActivate);
+      banner.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onActivate();
+        }
       });
     }
+
+    // Auto-shuffle every 30s — a quiet nudge, never a surprise mid-focus:
+    // paused while the tab is hidden (nothing changes unseen) and the timer
+    // restarts on any manual pick so clicks don't stack double advances.
+    let autoShuffleTimer = null;
+    function restartAutoShuffle() {
+      if (autoShuffleTimer) clearInterval(autoShuffleTimer);
+      autoShuffleTimer = setInterval(() => {
+        if (document.visibilityState === 'visible') nextSpark();
+      }, 30_000);
+    }
+    restartAutoShuffle();
   }
 
   initTodayView() {

@@ -154,17 +154,15 @@
 
     <!-- Main Content Area -->
     <main class="main-content container">
-      <!-- Ambient Spark Banner -->
-      <section class="spark-banner" id="spark-banner">
+      <!-- Ambient Spark Banner: the whole card is clickable — tap anywhere
+           for a new spark; it also shuffles on its own every 30 seconds -->
+      <section class="spark-banner" id="spark-banner" role="button" tabindex="0" aria-label="Teacher's Spark of the Day — activate for a new spark">
         <div class="spark-icon">✨</div>
         <div class="spark-content">
           <span class="spark-label">Teacher's Spark of the Day</span>
           <p class="spark-quote" id="spark-quote">“Teaching is not the filling of a pail, but the lighting of a fire.”</p>
           <span class="spark-author" id="spark-author">— William Butler Yeats</span>
         </div>
-        <button class="btn-subtle" id="btn-refresh-spark" title="New inspiration">
-          🔄 <span>Shuffle</span>
-        </button>
       </section>
 
       <!-- VIEW 1: Today's Rhythm -->
