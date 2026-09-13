@@ -19,6 +19,7 @@ import { GlobalSearch } from './global-search.js';
 import { buildTodayDeskStrip } from './desk-state.js';
 import { showToast } from './toast.js';
 import { showCalmConfirm } from './calm-dialog.js';
+import { initDeviceNotice } from './device-notice.js';
 
 class PedagogoDeskApp {
   constructor() {
@@ -43,6 +44,7 @@ class PedagogoDeskApp {
     this.initPerspective();
     this.initSpark();
     this.initTodayView();
+    initDeviceNotice();
 
     this.timetableView = new TimetableView(this.scheduleData);
     this.lessonPlanStudio = new LessonPlanStudio();

@@ -9226,3 +9226,139 @@ body.dark-mode .rhythm-dot.on {
   line-height: 1.5;
   color: var(--text-muted);
 }
+
+/* ============================================================
+   Handheld Device Notice (QR Sync guidance) 🌿
+   Calm once-per-session banner for phone/tablet visitors.
+   ============================================================ */
+.device-notice-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 16px);
+  z-index: 12000;
+  max-width: 460px;
+  width: calc(100% - 32px);
+  box-sizing: border-box;
+  padding: 16px 18px;
+  background: var(--surface, #FAF8F3);
+  border: 1px solid var(--border-soft, #E4E0D5);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(59, 99, 71, 0.16);
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+body.dark-mode .device-notice-banner {
+  background: var(--surface, #131714);
+  border-color: var(--border-soft, #2A332C);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.device-notice-banner.device-notice-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.device-notice-banner.device-notice-hiding {
+  opacity: 0;
+  transform: translate(-50%, 16px);
+  pointer-events: none;
+}
+
+.device-notice-title {
+  font-weight: 700;
+  font-size: 14.5px;
+  color: var(--primary, #3B6347);
+  margin-bottom: 6px;
+}
+
+.device-notice-body {
+  margin: 0 0 12px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text, #2F3B32);
+}
+
+body.dark-mode .device-notice-body {
+  color: var(--text, #D7E3D9);
+}
+
+.device-notice-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.device-notice-btn {
+  display: inline-block;
+  text-decoration: none;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: filter 0.15s ease, background 0.15s ease;
+}
+
+.device-notice-btn:focus-visible {
+  outline: 2px solid var(--primary, #3B6347);
+  outline-offset: 2px;
+}
+
+.device-notice-btn-primary {
+  background: var(--primary, #3B6347);
+  color: #FAF8F3;
+}
+
+.device-notice-btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.device-notice-btn-quiet {
+  background: transparent;
+  color: var(--text-muted, #6E7B70);
+  border: 1px solid var(--border-soft, #E4E0D5);
+}
+
+.device-notice-btn-quiet:hover {
+  background: var(--border-soft, #E4E0D5);
+}
+
+/* "Coming soon" note shown while the mobile app has no download URL yet */
+.device-notice-soon {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted, #6E7B70);
+  align-self: center;
+  padding: 6px 0;
+}
+
+@media (max-width: 480px) {
+  .device-notice-banner {
+    left: 16px;
+    right: 16px;
+    width: auto;
+    transform: translateY(16px);
+  }
+
+  .device-notice-banner.device-notice-visible {
+    transform: translateY(0);
+  }
+
+  .device-notice-banner.device-notice-hiding {
+    transform: translateY(16px);
+  }
+
+  .device-notice-btn {
+    flex: 1;
+  }
+}
+
+@media print {
+  .device-notice-banner { display: none; }
+}
+
