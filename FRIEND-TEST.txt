@@ -25,8 +25,8 @@ BEFORE YOU START (2 minutes)
 ----------------------------
 [ ] Open this link in Chrome or Edge:
     https://pedagogo-dashboard.vercel.app
-[ ] If it asks for an AI key: message me, I will send you an
-    invite key to paste in.
+[ ] Message me for your INVITE LINK before starting - open
+    it in Chrome FIRST (one tap, it saves itself).
 [ ] Have your PDF ready where you can find it.
 
 PART 1 - FIRST TOUCH (on purpose, no instructions!)
