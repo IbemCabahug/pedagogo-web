@@ -479,7 +479,7 @@ export class DocumentDesk {
             </div>
             <div class="guard-actions">
               <button class="btn-subtle" id="btn-guard-verify">Verify a claim now</button>
-              <button class="btn-subtle guard-dismiss" id="btn-guard-dismiss" aria-label="Dismiss">Dismiss</button>
+              <button class="btn-subtle guard-dismiss" id="btn-guard-dismiss" aria-label="Dismiss for this session">Dismiss for this session</button>
             </div>
           </div>
           `}
@@ -1368,6 +1368,10 @@ export class DocumentDesk {
 
     if (subtabVerbatim) {
       subtabVerbatim.addEventListener('click', () => {
+        // 10-persona audit F2: count DIRECT Verbatim opens (Cora-style readers
+        // who read the transcript without ever tapping a citation — those are
+        // already counted by citation_tap, so never log both for one action).
+        try { ReadingTelemetry.log('verbatim_open'); } catch (e) {}
         this.switchSubTab('verbatim');
       });
     }

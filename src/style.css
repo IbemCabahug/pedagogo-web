@@ -924,6 +924,44 @@ body.dark-mode .preflight-chip {
   font-weight: 700;
 }
 
+/* Desk momentum strip (Sprint B §7.2 + 10-persona audit F6):
+   due LET cards + resume, on the default Today tab. Hidden entirely
+   when there is nothing to say — calm by default, never naggy. */
+.desk-momentum-card {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  align-items: center;
+}
+
+.desk-momentum-card[hidden] {
+  display: none;
+}
+
+.desk-momentum-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.desk-momentum-icon {
+  font-size: 18px;
+}
+
+.desk-momentum-text {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.desk-momentum-sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
 .class-list {
   display: flex;
   flex-direction: column;

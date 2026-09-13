@@ -16,6 +16,7 @@ import { AssessmentTracker } from './assessment-tracker.js';
 import { LessonPlanBuilder } from './lesson-plan-builder.js';
 import { AnecdotalRecordTracker } from './anecdotal-record-tracker.js';
 import { GlobalSearch } from './global-search.js';
+import { buildTodayDeskStrip } from './desk-state.js';
 import { showToast } from './toast.js';
 import { showCalmConfirm } from './calm-dialog.js';
 
@@ -308,6 +309,13 @@ class PedagogoDeskApp {
       v.classList.toggle('active', v.id === `view-${tabKey}`);
     });
 
+    // Refresh Today's rhythm (incl. the desk-momentum strip) so due-card
+    // counts stay honest when returning to the default tab mid-session
+    // (Sprint B §7.2 + 10-persona audit F6)
+    if (tabKey === 'today') {
+      this.initTodayView();
+    }
+
     // Refresh attendance view so it follows the latest roster/section selection
     if (tabKey === 'attendance' && this.attendanceTracker) {
       this.attendanceTracker.selectedClassId = this.classManager?.selectedClassId || this.attendanceTracker.selectedClassId;
@@ -440,6 +448,7 @@ class PedagogoDeskApp {
 
     this.renderNextUpHero(todaySlots[0], subjectMap);
     this.renderTodayList(todaySlots, subjectMap);
+    this.renderDeskMomentumStrip();
   }
 
   renderNextUpHero(nextSlot, subjectMap) {
@@ -501,6 +510,56 @@ class PedagogoDeskApp {
         </div>
       </div>
     `;
+  }
+
+  renderDeskMomentumStrip() {
+    const mount = document.getElementById('desk-momentum-strip');
+    if (!mount) return;
+
+    // Filenames are user-controlled — escape before injecting into HTML.
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    let cards = [];
+    let sessions = {};
+    try { cards = JSON.parse(localStorage.getItem('pedagogo_let_cards') || '[]') || []; } catch (e) { cards = []; }
+    try { sessions = JSON.parse(localStorage.getItem('pedagogo_reading_sessions') || '{}') || {}; } catch (e) { sessions = {}; }
+
+    const { dueCount, resume } = buildTodayDeskStrip({ cards, sessions });
+    if (!dueCount && !resume) {
+      mount.hidden = true;
+      mount.innerHTML = '';
+      return;
+    }
+
+    const items = [];
+    if (dueCount > 0) {
+      items.push(`
+        <div class="desk-momentum-item">
+          <span class="desk-momentum-icon">🎯</span>
+          <div>
+            <div class="desk-momentum-text">${dueCount} LET card${dueCount === 1 ? '' : 's'} due for review</div>
+            <div class="desk-momentum-sub">A short Daily Drill keeps the 1-day Box honest</div>
+          </div>
+          <button class="btn-subtle" data-jump-tab="reviewer">Start Daily Drill</button>
+        </div>`);
+    }
+    if (resume) {
+      items.push(`
+        <div class="desk-momentum-item">
+          <span class="desk-momentum-icon">📖</span>
+          <div>
+            <div class="desk-momentum-text">Resume "${esc(resume.filename)}"</div>
+            <div class="desk-momentum-sub">${esc(resume.subTabLabel)} · saved ${esc(resume.ageLabel)}</div>
+          </div>
+          <button class="btn-subtle" data-jump-tab="reading-desk">Open Reading Desk</button>
+        </div>`);
+    }
+
+    mount.hidden = false;
+    mount.innerHTML = items.join('');
+    mount.querySelectorAll('[data-jump-tab]').forEach(btn => {
+      btn.addEventListener('click', () => this.switchTab(btn.dataset.jumpTab));
+    });
   }
 
   renderTodayList(todaySlots, subjectMap) {
