@@ -3954,6 +3954,60 @@ body.dark-mode .contrastive-matrix-table tr:nth-child(even) {
   line-height: 1.5;
 }
 
+/* §7.1 — Session awareness (fatigue-aware recall-pass offer) */
+.fatigue-nudge-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--sage-primary);
+  border-left: 4px solid var(--sage-primary);
+  border-radius: var(--radius-sm);
+  background: var(--sage-light);
+}
+.fatigue-nudge-text {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--sage-text);
+}
+.fatigue-nudge-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.btn-fatigue-recall {
+  border: 1px solid var(--sage-primary);
+  background: var(--sage-primary);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.btn-fatigue-recall:hover {
+  background: var(--sage-text);
+  border-color: var(--sage-text);
+}
+.btn-fatigue-dismiss {
+  border: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text-muted);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.btn-fatigue-dismiss:hover {
+  color: var(--sage-text);
+  border-color: var(--sage-primary);
+}
+
 /* Verbatim Panel */
 .verbatim-view-toggle {
   display: inline-flex;

@@ -10,6 +10,7 @@ import { showToast } from './toast.js';
 import { ReadingTelemetry } from './reading-telemetry.js';
 import { SyncManager } from './sync-manager.js';
 import { addAnalyzedDoc, crossDocStudyNext, studySetChip, STUDY_SET_KEY } from './study-set.js';
+import { bumpSessionStats, parseSessionStats, sessionWord, SESSION_STATS_KEY } from './session-stats.js';
 
 export class DocumentDesk {
   static SESSIONS_KEY = 'pedagogo_reading_sessions';
@@ -27,6 +28,8 @@ export class DocumentDesk {
     this.isProcessing = false;
     this.isCornellFolded = false; // "Fold & Test" active recall state
     this.termBankMisses = new Map(); // term -> { meaning, anchor } starred as "couldn't recall"
+    this._fatigueNudgeShown = false;    // §7.1: one pacing nudge per session (never nag)
+    this._fatigueNudgeDismissed = false;
     this.isSplitView = localStorage.getItem('pedagogo_reader_split_view') === 'true';
     this.originSubTab = 'synthesis';
     this.originScrollY = 0;
@@ -402,6 +405,8 @@ export class DocumentDesk {
         </div>
 
         ${this.studySetChipHtml()}
+
+        ${this.fatigueNudgeHtml()}
 
         <!-- Sub-tab Perspective Switcher: Synthesis vs Cornell vs Verbatim -->
         <div class="reading-subtabs">
@@ -1177,6 +1182,70 @@ export class DocumentDesk {
     } catch (e) { return ''; }
   }
 
+  // ============================================================
+  // §7.1 — Session awareness (fatigue-aware recall-pass offer)
+  // ============================================================
+
+  /**
+   * Records the finished analysis and decides whether the ONE calm pacing
+   * nudge is earned (2nd+ analysis today, within 90 minutes of the previous
+   * one). Best-effort: pacing stats never block the desk. Call this BEFORE
+   * render() so the header template can include the banner when earned.
+   */
+  bumpFatigueStats() {
+    try {
+      const docId = this.currentDocId || this.makeDocId(this.currentDoc);
+      const stats = parseSessionStats(localStorage.getItem(SESSION_STATS_KEY), new Date());
+      const { stats: next, decision } = bumpSessionStats(stats, { docId, now: new Date() });
+      localStorage.setItem(SESSION_STATS_KEY, JSON.stringify(next));
+      if (decision.nudge && !this._fatigueNudgeShown) {
+        this._fatigueNudgeShown = true;
+        try { ReadingTelemetry.log('fatigue_nudge_shown'); } catch (e) {}
+      }
+    } catch (e) { /* pacing is best-effort; never block the desk */ }
+  }
+
+  /** The one dismissible pacing banner (plan §7.1) — '' unless earned this session. */
+  fatigueNudgeHtml() {
+    if (!this._fatigueNudgeShown || this._fatigueNudgeDismissed) return '';
+    try {
+      const stats = parseSessionStats(localStorage.getItem(SESSION_STATS_KEY), new Date());
+      const n = Math.max(1, stats.docsToday);
+      const word = sessionWord(new Date());
+      return `<div class="fatigue-nudge-banner" id="fatigue-nudge-banner" role="status" aria-label="Pacing suggestion">
+        <div class="fatigue-nudge-text">
+          <strong>You've studied ${n} doc${n === 1 ? '' : 's'} ${word}.</strong>
+          Quick win: a 10-min recall pass (Term Bank → star misses → push) beats a full new read.
+        </div>
+        <div class="fatigue-nudge-actions">
+          <button type="button" class="btn-fatigue-recall" id="btn-fatigue-recall">🌱 Start recall pass</button>
+          <button type="button" class="btn-fatigue-dismiss" id="btn-fatigue-dismiss">Keep reading anyway</button>
+        </div>
+      </div>`;
+    } catch (e) { return ''; }
+  }
+
+  /** "Start recall pass": auto-covers the Term Bank and scrolls to it (Familiarize flow). */
+  startRecallPass() {
+    const wrap = document.getElementById('term-bank-wrap');
+    const coverBtn = document.getElementById('btn-term-bank-cover');
+    if (wrap && coverBtn && !wrap.classList.contains('term-bank-covered')) {
+      coverBtn.click();
+    }
+    const target = wrap || document.querySelector('.card-chunks');
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    try { ReadingTelemetry.log('fatigue_nudge_recall_start'); } catch (e) {}
+    showToast('🌱 Recall pass: cover the meanings, recall aloud, star (★) the misses.', 'info');
+    this.dismissFatigueNudge();
+  }
+
+  /** Removes the banner for this session (targeted DOM removal — never nag). */
+  dismissFatigueNudge() {
+    this._fatigueNudgeDismissed = true;
+    const el = document.getElementById('fatigue-nudge-banner');
+    if (el) el.remove();
+  }
+
   /** Cross-doc Study Next card (only once ≥2 docs are in the set). */
   crossDocStudyNextHtml() {
     try {
@@ -1667,6 +1736,19 @@ export class DocumentDesk {
         const covered = wrap.classList.toggle('term-bank-covered');
         btnTermBankCover.setAttribute('aria-pressed', String(covered));
         btnTermBankCover.innerHTML = covered ? '👁️ <span>Reveal Meanings</span>' : '🙈 <span>Cover Meanings — Test Yourself</span>';
+      });
+    }
+
+    // §7.1 fatigue nudge: start recall pass / keep reading (one nudge per session)
+    const btnFatigueRecall = document.getElementById('btn-fatigue-recall');
+    if (btnFatigueRecall) {
+      btnFatigueRecall.addEventListener('click', () => this.startRecallPass());
+    }
+    const btnFatigueDismiss = document.getElementById('btn-fatigue-dismiss');
+    if (btnFatigueDismiss) {
+      btnFatigueDismiss.addEventListener('click', () => {
+        try { ReadingTelemetry.log('fatigue_nudge_dismiss'); } catch (e) {}
+        this.dismissFatigueNudge();
       });
     }
 
@@ -2457,6 +2539,7 @@ export class DocumentDesk {
       }
       this.currentAnalysis = analysis;
       this.recordStudySetEntry(analysis);
+      this.bumpFatigueStats(); // §7.1: pacing nudge decided before render() so the header can show it
       this.activeSummaryType = analysis.source === 'QUICK_LOOK' ? 'quick' : type;
       this.activeSubTab = 'synthesis';
       this.currentSessionSavedAt = new Date().toISOString();
