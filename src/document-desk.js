@@ -9,6 +9,7 @@ import { DocumentSummarizer } from './document-summarizer.js';
 import { showToast } from './toast.js';
 import { ReadingTelemetry } from './reading-telemetry.js';
 import { SyncManager } from './sync-manager.js';
+import { addAnalyzedDoc, crossDocStudyNext, studySetChip, STUDY_SET_KEY } from './study-set.js';
 
 export class DocumentDesk {
   static SESSIONS_KEY = 'pedagogo_reading_sessions';
@@ -400,6 +401,8 @@ export class DocumentDesk {
           </div>
         </div>
 
+        ${this.studySetChipHtml()}
+
         <!-- Sub-tab Perspective Switcher: Synthesis vs Cornell vs Verbatim -->
         <div class="reading-subtabs">
           <button class="reading-subtab ${this.activeSubTab === 'synthesis' ? 'active' : ''}" data-subtab="synthesis" id="btn-subtab-synthesis">
@@ -483,6 +486,7 @@ export class DocumentDesk {
             </div>
           </div>
           `}
+          ${this.crossDocStudyNextHtml()}
           <div class="synthesis-content-render" id="synthesis-rendered-area">
             ${this.activeSummaryType === 'quick' ? this.renderQuickLook(analysis?.markdown || '') : this.renderSynthesisMarkdown(analysis?.markdown || '')}
           </div>
@@ -1030,8 +1034,12 @@ export class DocumentDesk {
    * (Part A scenario MCQs + Part B term fill-ins). Legacy 3-MCQ output still parses.
    */
   collectReviewerQuestions() {
-    const md = this.currentAnalysis?.markdown || '';
-    const qSection = md.split(/### 5\. 🎯 Licensure/i)[1] || '';
+    return DocumentDesk.collectReviewerQuestionsFromMarkdown(this.currentAnalysis?.markdown || '');
+  }
+
+  /** Pure markdown→questions parser (shared by the per-doc push and the §7.3 combined deck). */
+  static collectReviewerQuestionsFromMarkdown(md) {
+    const qSection = (md || '').split(/### 5\. 🎯 Licensure/i)[1] || '';
     const itemSplitter = /\*\*(Question \d+|Fill-in \d+):\*\*/g;
     const rawItems = [];
     let lastLabel = null;
@@ -1107,6 +1115,108 @@ export class DocumentDesk {
       });
     });
     return cards;
+  }
+
+  // ============================================================
+  // §7.3 — Cross-doc study set ("Multi-PDF orchestration")
+  // ============================================================
+
+  /** Records the just-analyzed doc into the persisted study set (best-effort). */
+  recordStudySetEntry(analysis) {
+    try {
+      let set = {};
+      try { set = JSON.parse(localStorage.getItem(STUDY_SET_KEY) || '{}') || {}; } catch (e) { set = {}; }
+      const questions = analysis?.markdown
+        ? DocumentDesk.collectReviewerQuestionsFromMarkdown(analysis.markdown)
+        : [];
+      const mcqs = questions.filter((q) => q.cardKind === 'SCENARIO_MCQ').length;
+      const drills = questions.filter((q) => q.cardKind === 'TERM_FILL_IN').length;
+      const entry = {
+        id: this.currentDocId || this.makeDocId(this.currentDoc),
+        filename: this.currentDoc?.filename || 'document',
+        missedTerms: this.termBankMisses.size,
+        drills,
+        mcqs,
+        analyzedAt: analysis?.analyzedAt || new Date().toISOString()
+      };
+      const next = addAnalyzedDoc(set, entry);
+      localStorage.setItem(STUDY_SET_KEY, JSON.stringify(next));
+    } catch (e) { /* study set persistence is best-effort; never block the desk */ }
+  }
+
+  /** Keeps the set's live missed-terms count current with this doc's stars. */
+  refreshStudySetMisses() {
+    try {
+      if (!this.currentDocId) return;
+      let set = {};
+      try { set = JSON.parse(localStorage.getItem(STUDY_SET_KEY) || '{}') || {}; } catch (e) { set = {}; }
+      const entry = set[this.currentDocId];
+      if (entry && entry.missedTerms !== this.termBankMisses.size) {
+        entry.missedTerms = this.termBankMisses.size;
+        localStorage.setItem(STUDY_SET_KEY, JSON.stringify(set));
+      }
+    } catch (e) { /* best-effort */ }
+  }
+
+  /** "N of M analyzed" chip row for the workspace header (hidden until ≥1 doc). */
+  studySetChipHtml() {
+    this.refreshStudySetMisses();
+    try {
+      let set = {};
+      try { set = JSON.parse(localStorage.getItem(STUDY_SET_KEY) || '{}') || {}; } catch (e) { set = {}; }
+      const { analyzed, total } = studySetChip(set);
+      if (analyzed === 0) return '';
+      const hint = analyzed < 2
+        ? 'Analyze one more document to unlock a combined Study Next.'
+        : 'One combined deck for this set — see the card below.';
+      return `<div class="study-set-chip-row" aria-label="Study set progress">
+        <span class="study-set-chip-label">📚 Study set</span>
+        <span class="chip chip-study-set">${analyzed} of ${total} analyzed</span>
+        <span class="study-set-chip-hint">${hint}</span>
+      </div>`;
+    } catch (e) { return ''; }
+  }
+
+  /** Cross-doc Study Next card (only once ≥2 docs are in the set). */
+  crossDocStudyNextHtml() {
+    try {
+      let set = {};
+      try { set = JSON.parse(localStorage.getItem(STUDY_SET_KEY) || '{}') || {}; } catch (e) { set = {}; }
+      const reco = crossDocStudyNext(set);
+      if (!reco) return '';
+      const files = reco.files.map((f) => this.escapeHtml(f)).join(' + ');
+      return `<div class="study-next-card card-cross-doc" data-study-type="memorize">
+        <span>🔁 Study Next — combined set</span>
+        <p><strong>All ${reco.analyzedCount} analyzed.</strong> ${reco.missedTerms} missed terms across ${files} — one deck (<strong>${reco.drills} drills + ${reco.mcqs} MCQs</strong>, ${reco.spacing}).</p>
+        <button type="button" class="btn-study-next btn-study-next-push" id="btn-cross-doc-push" title="Import every drill from this study set into your LET Reviewer (spaced 1d / 3d / 7d)">📥 Push combined deck</button>
+      </div>`;
+    } catch (e) { return ''; }
+  }
+
+  /** Merges every study-set doc's questions into one deduped deck for the Reviewer. */
+  buildCombinedDeck() {
+    const out = [];
+    const seen = new Set();
+    const push = (questions) => {
+      (questions || []).forEach((q) => {
+        const key = q.front || q.question;
+        if (key && !seen.has(key)) { seen.add(key); out.push(q); }
+      });
+    };
+    try {
+      const sessions = this.loadDeskSessions(true) || {};
+      let set = {};
+      try { set = JSON.parse(localStorage.getItem(STUDY_SET_KEY) || '{}') || {}; } catch (e) { set = {}; }
+      Object.keys(set).forEach((id) => {
+        const s = sessions[id];
+        if (s && s.analysis && s.analysis.markdown) {
+          push(DocumentDesk.collectReviewerQuestionsFromMarkdown(s.analysis.markdown));
+        }
+      });
+    } catch (e) { /* ignore */ }
+    // Always include the live current doc (covers a dropped/purged session).
+    push(this.collectReviewerQuestions());
+    return out;
   }
 
   /**
@@ -1608,6 +1718,23 @@ export class DocumentDesk {
         this.dispatchReviewerImport(parsed);
         btnSnPush.innerHTML = '✓ <span>Pushed!</span>';
         setTimeout(() => { btnSnPush.innerHTML = '📥 <span>Push All Drills</span>'; }, 2200);
+      });
+    }
+
+    // §7.3 — Cross-doc Study Next CTA: push the combined deck across the study set
+    const btnCrossDocPush = document.getElementById('btn-cross-doc-push');
+    if (btnCrossDocPush) {
+      btnCrossDocPush.addEventListener('click', () => {
+        const questions = this.buildCombinedDeck();
+        if (questions.length === 0) {
+          showToast('No drills to push yet — star a Term Bank miss or generate a study sheet first.', 'info');
+          return;
+        }
+        try { ReadingTelemetry.log('cross_doc_push'); } catch (e) {}
+        this.dispatchReviewerImport(questions);
+        btnCrossDocPush.innerHTML = '✓ <span>Pushed!</span>';
+        setTimeout(() => { btnCrossDocPush.innerHTML = '📥 <span>Push combined deck</span>'; }, 2200);
+        showToast(`✓ ${questions.length} drills pushed across this study set (1d / 3d / 7d).`, 'success');
       });
     }
 
@@ -2329,6 +2456,7 @@ export class DocumentDesk {
         analysis = await DocumentSummarizer.summarize(this.currentDoc, onStage);
       }
       this.currentAnalysis = analysis;
+      this.recordStudySetEntry(analysis);
       this.activeSummaryType = analysis.source === 'QUICK_LOOK' ? 'quick' : type;
       this.activeSubTab = 'synthesis';
       this.currentSessionSavedAt = new Date().toISOString();
